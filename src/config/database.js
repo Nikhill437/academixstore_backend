@@ -61,11 +61,18 @@ let sequelize;
 if (process.env.DATABASE_URL) {
   const url = process.env.DATABASE_URL;
   const useSSL = process.env.DB_SSL_REQUIRE === 'true' || /sslmode=require/i.test(url);
-  const options = { ...baseConfig };
-  if (useSSL) {
-    options.dialectOptions = options.dialectOptions || {};
-    options.dialectOptions.ssl = { require: true, rejectUnauthorized: false };
-  }
+  const options = { 
+    ...baseConfig,
+    dialectOptions: {
+      ssl: useSSL ? {
+        require: true,
+        rejectUnauthorized: false
+      } : false
+    },
+    // Force IPv4 to avoid IPv6 issues on some platforms
+    host: process.env.DB_HOST,
+    family: 4
+  };
   sequelize = new Sequelize(url, options);
 } else {
   const username = process.env.DB_USER || process.env.DB_USERNAME || baseConfig.username;

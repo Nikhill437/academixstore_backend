@@ -59,51 +59,40 @@ const baseConfig = config[env] || config.development;
 
 let sequelize;
 
-// Use DATABASE_URL if available, otherwise individual parameters
-if (process.env.DATABASE_URL) {
-  // For Render deployment, use DATABASE_URL with SSL
-  sequelize = new Sequelize(process.env.DATABASE_URL, {
-    dialect: 'postgres',
-    dialectOptions: {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false
-      }
-    },
-    logging: env === 'production' ? false : console.log,
-    pool: {
-      max: 20,
-      min: 0,
-      acquire: 30000,
-      idle: 10000,
-    }
-  });
-} else {
-  // For local development
-  sequelize = new Sequelize(
-    process.env.DB_NAME || 'postgres',
-    process.env.DB_USER || 'postgres',
-    process.env.DB_PASS || 'password',
-    {
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT) || 5432,
-      dialect: 'postgres',
-      dialectOptions: {
-        ssl: process.env.DB_HOST?.includes('supabase.co') ? {
-          require: true,
-          rejectUnauthorized: false
-        } : false
-      },
-      logging: env === 'production' ? false : console.log,
-      pool: {
-        max: 5,
-        min: 0,
-        acquire: 30000,
-        idle: 10000,
-      }
-    }
-  );
+// Always use individual connection parameters to avoid IPv6 issues
+const username = process.env.DB_USER || process.env.DB_USERNAME || baseConfig.username;
+const password = process.env.DB_PASS || process.env.DB_PASSWORD || baseConfig.password;
+const database = process.env.DB_NAME || baseConfig.database;
+const host = process.env.DB_HOST || baseConfig.host;
+const port = process.env.DB_PORT || baseConfig.port;
+
+const connectionOptions = { 
+  ...baseConfig, 
+  host, 
+  port,
+  // Force IPv4 to avoid IPv6 connectivity issues
+  dialectOptions: {
+    ...baseConfig.dialectOptions,
+    // Force IPv4
+    family: 4
+  }
+};
+
+// Add SSL configuration for production or Supabase
+if (env === 'production' || (host && host.includes('supabase.co'))) {
+  connectionOptions.dialectOptions = connectionOptions.dialectOptions || {};
+  connectionOptions.dialectOptions.ssl = {
+    require: true,
+    rejectUnauthorized: false,
+  };
 }
+
+sequelize = new Sequelize(
+  database,
+  username,
+  password,
+  connectionOptions
+);
 
 export default sequelize;
 export { config };

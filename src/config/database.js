@@ -35,13 +35,14 @@ const config = {
     logging: false,
   },
   production: {
-    use_env_variable: 'DATABASE_URL',
     dialect: 'postgres',
     dialectOptions: {
       ssl: {
         require: true,
         rejectUnauthorized: false,
       },
+      // Force IPv4 to avoid IPv6 issues
+      family: 4,
     },
     logging: false,
     pool: {
@@ -58,38 +59,49 @@ const baseConfig = config[env] || config.development;
 
 let sequelize;
 
+// Use DATABASE_URL if available, otherwise individual parameters
 if (process.env.DATABASE_URL) {
-  const url = process.env.DATABASE_URL;
-  const useSSL = process.env.DB_SSL_REQUIRE === 'true' || /sslmode=require/i.test(url);
-  const options = { ...baseConfig };
-  if (useSSL) {
-    options.dialectOptions = options.dialectOptions || {};
-    options.dialectOptions.ssl = { require: true, rejectUnauthorized: false };
-  }
-  sequelize = new Sequelize(url, options);
+  // For Render deployment, use DATABASE_URL with SSL
+  sequelize = new Sequelize(process.env.DATABASE_URL, {
+    dialect: 'postgres',
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
+    },
+    logging: env === 'production' ? false : console.log,
+    pool: {
+      max: 20,
+      min: 0,
+      acquire: 30000,
+      idle: 10000,
+    }
+  });
 } else {
-  const username = process.env.DB_USER || process.env.DB_USERNAME || baseConfig.username;
-  const password = process.env.DB_PASS || process.env.DB_PASSWORD || baseConfig.password;
-  const database = process.env.DB_NAME || baseConfig.database;
-  const host = process.env.DB_HOST || baseConfig.host;
-  const port = process.env.DB_PORT || baseConfig.port;
-  
-  const connectionOptions = { ...baseConfig, host, port };
-  
-  // Add SSL configuration if connecting to Supabase
-  if (host && host.includes('supabase.co')) {
-    connectionOptions.dialectOptions = connectionOptions.dialectOptions || {};
-    connectionOptions.dialectOptions.ssl = {
-      require: true,
-      rejectUnauthorized: false,
-    };
-  }
-  
+  // For local development
   sequelize = new Sequelize(
-    database,
-    username,
-    password,
-    connectionOptions
+    process.env.DB_NAME || 'postgres',
+    process.env.DB_USER || 'postgres',
+    process.env.DB_PASS || 'password',
+    {
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT) || 5432,
+      dialect: 'postgres',
+      dialectOptions: {
+        ssl: process.env.DB_HOST?.includes('supabase.co') ? {
+          require: true,
+          rejectUnauthorized: false
+        } : false
+      },
+      logging: env === 'production' ? false : console.log,
+      pool: {
+        max: 5,
+        min: 0,
+        acquire: 30000,
+        idle: 10000,
+      }
+    }
   );
 }
 

@@ -35,13 +35,14 @@ const config = {
     logging: false,
   },
   production: {
-    use_env_variable: 'DATABASE_URL',
     dialect: 'postgres',
     dialectOptions: {
       ssl: {
         require: true,
         rejectUnauthorized: false,
       },
+      // Force IPv4 to avoid IPv6 issues
+      family: 4,
     },
     logging: false,
     pool: {
@@ -58,47 +59,40 @@ const baseConfig = config[env] || config.development;
 
 let sequelize;
 
-if (process.env.DATABASE_URL) {
-  const url = process.env.DATABASE_URL;
-  const useSSL = process.env.DB_SSL_REQUIRE === 'true' || /sslmode=require/i.test(url);
-  const options = { 
-    ...baseConfig,
-    dialectOptions: {
-      ssl: useSSL ? {
-        require: true,
-        rejectUnauthorized: false
-      } : false
-    },
-    // Force IPv4 to avoid IPv6 issues on some platforms
-    host: process.env.DB_HOST,
+// Always use individual connection parameters to avoid IPv6 issues
+const username = process.env.DB_USER || process.env.DB_USERNAME || baseConfig.username;
+const password = process.env.DB_PASS || process.env.DB_PASSWORD || baseConfig.password;
+const database = process.env.DB_NAME || baseConfig.database;
+const host = process.env.DB_HOST || baseConfig.host;
+const port = process.env.DB_PORT || baseConfig.port;
+
+const connectionOptions = { 
+  ...baseConfig, 
+  host, 
+  port,
+  // Force IPv4 to avoid IPv6 connectivity issues
+  dialectOptions: {
+    ...baseConfig.dialectOptions,
+    // Force IPv4
     family: 4
-  };
-  sequelize = new Sequelize(url, options);
-} else {
-  const username = process.env.DB_USER || process.env.DB_USERNAME || baseConfig.username;
-  const password = process.env.DB_PASS || process.env.DB_PASSWORD || baseConfig.password;
-  const database = process.env.DB_NAME || baseConfig.database;
-  const host = process.env.DB_HOST || baseConfig.host;
-  const port = process.env.DB_PORT || baseConfig.port;
-  
-  const connectionOptions = { ...baseConfig, host, port };
-  
-  // Add SSL configuration if connecting to Supabase
-  if (host && host.includes('supabase.co')) {
-    connectionOptions.dialectOptions = connectionOptions.dialectOptions || {};
-    connectionOptions.dialectOptions.ssl = {
-      require: true,
-      rejectUnauthorized: false,
-    };
   }
-  
-  sequelize = new Sequelize(
-    database,
-    username,
-    password,
-    connectionOptions
-  );
+};
+
+// Add SSL configuration for production or Supabase
+if (env === 'production' || (host && host.includes('supabase.co'))) {
+  connectionOptions.dialectOptions = connectionOptions.dialectOptions || {};
+  connectionOptions.dialectOptions.ssl = {
+    require: true,
+    rejectUnauthorized: false,
+  };
 }
+
+sequelize = new Sequelize(
+  database,
+  username,
+  password,
+  connectionOptions
+);
 
 export default sequelize;
 export { config };

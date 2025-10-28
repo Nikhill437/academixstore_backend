@@ -8,18 +8,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: DB_HOST
-        value: db.uavnihslleouzhecoeln.supabase.co
-      - key: DB_NAME
-        value: postgres
-      - key: DB_USER
-        value: postgres
-      - key: DB_PASS
-        value: AZgvQBLSIApoPo7L
-      - key: DB_PORT
-        value: 5432
-      - key: DB_SSL_REQUIRE
-        value: true
+      - key: DATABASE_URL
+        value: your_neon_database_url_here
       - key: JWT_SECRET
         value: your-super-secret-jwt-key-change-in-production-min-32-chars
       - key: AWS_REGION

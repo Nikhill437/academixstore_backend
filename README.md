@@ -93,13 +93,8 @@ The API will be available at `http://localhost:3000/api`
 ### Environment Variables
 
 ```env
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/bookapp_dev
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=bookapp_dev
-DB_USER=your_db_user
-DB_PASS=your_db_password
+# Database (Neon PostgreSQL)
+DATABASE_URL=postgresql://user:password@host.neon.tech/dbname?sslmode=require
 
 # JWT
 JWT_SECRET=your-super-secret-jwt-key-change-in-production

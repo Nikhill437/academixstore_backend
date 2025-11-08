@@ -31,6 +31,9 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust proxy - required for Render and other reverse proxies
+app.set('trust proxy', 1);
+
 // CORS configuration - MUST be before helmet
 const corsOptions = {
   origin: true, // Allow all origins in production

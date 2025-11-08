@@ -31,44 +31,26 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Global middleware
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }
-})); // Security headers
-
-// CORS configuration for production deployment
+// CORS configuration - MUST be before helmet
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, Postman, or curl)
-    if (!origin) return callback(null, true);
-    
-    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
-      'http://localhost:3000',
-      'http://localhost:5173',
-      'http://192.168.1.7:3000'
-    ];
-    
-    // In production, allow all origins (you can restrict this later)
-    if (process.env.NODE_ENV === 'production') {
-      return callback(null, true);
-    }
-    
-    if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('localhost')) {
-      callback(null, true);
-    } else {
-      callback(null, true); // Allow all for now, change to false to restrict
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  origin: true, // Allow all origins in production
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Access-Control-Request-Method', 'Access-Control-Request-Headers'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range', 'X-Total-Count'],
   credentials: true,
-  optionsSuccessStatus: 200,
-  maxAge: 86400 // Cache preflight requests for 24 hours
+  optionsSuccessStatus: 204,
+  preflightContinue: false
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Handle preflight requests for all routes
+app.options('*', cors(corsOptions)); // Handle all preflight requests
+
+// Global middleware
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+  crossOriginEmbedderPolicy: false
+})); // Security headers
 app.use(compression()); // Gzip compression
 app.use(morgan('combined')); // Logging
 
@@ -95,6 +77,16 @@ app.get('/health', (req, res) => {
     message: 'Educational Book Subscription API is running',
     timestamp: new Date().toISOString(),
     version: '1.0.0'
+  });
+});
+
+// CORS test endpoint
+app.get('/api/test-cors', (req, res) => {
+  res.json({
+    success: true,
+    message: 'CORS is working correctly',
+    origin: req.headers.origin || 'No origin header',
+    timestamp: new Date().toISOString()
   });
 });
 

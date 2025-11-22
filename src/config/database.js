@@ -60,6 +60,7 @@ if (databaseUrl && !databaseUrl.includes('://')) {
   databaseUrl = `postgres://${databaseUrl}`;
 }
 
+
 if (!databaseUrl) {
   throw new Error('DATABASE_URL environment variable is required and cannot be empty');
 }

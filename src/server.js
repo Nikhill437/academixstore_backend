@@ -25,11 +25,16 @@ import individualUsersRoutes from './routes/individualUsers.js';
 import { authenticateToken } from './middleware/auth.js';
 import errorHandler from './middleware/errorHandler.js';
 
+import multer from "multer";
+import { pool } from "./db.js";
+import { uploadToS3 } from "./s3.js";
+
 // Load environment variables
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const upload = multer(); // memory storage
 
 // Trust proxy - required for Render and other reverse proxies
 app.set('trust proxy', 1);
@@ -114,6 +119,47 @@ app.use('/api/subscriptions', authenticateToken, subscriptionRoutes);
 app.use('/api/advertisements', advertisementRoutes); // Some endpoints are public
 app.use('/api/system-settings', systemSettingsRoutes); // Some endpoints are public
 app.use('/api/individual-users', individualUsersRoutes); // Super admin only
+
+
+app.post("/api/upload", upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No file uploaded" });
+    }
+
+    const file = req.file;
+
+    // 1) Upload to S3
+    const { key, url } = await uploadToS3(
+      file.buffer,
+      file.originalname,
+      file.mimetype
+    );
+
+    // 2) Insert DB row
+    const query = `
+      INSERT INTO uploads (original_name, mime_type, s3_key, s3_url)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *;
+    `;
+
+    const values = [file.originalname, file.mimetype, key, url];
+    const result = await pool.query(query, values);
+
+    // 3) Respond
+    res.json({ success: true, data: result.rows[0] });
+
+  } catch (err) {
+    console.error("Upload error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Upload failed",
+      error: err.message,
+    });
+  }
+});
+
+
 
 // Catch-all 404 handler
 app.use((req, res) => {

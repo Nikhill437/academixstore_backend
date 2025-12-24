@@ -1,5 +1,4 @@
 import express from 'express';
-import bcrypt from 'bcryptjs';
 import { Op } from 'sequelize';
 import { User } from '../models/index.js';
 import { authenticateToken } from '../middleware/auth.js';
@@ -141,7 +140,7 @@ router.post('/',
       // Create individual user
       const user = await User.create({
         email,
-        password_hash: password, // Will be hashed by the model hook
+        password_hash: password, // Stored as plain text
         full_name,
         role: 'user',
         college_id: null, // Individual users are not associated with colleges
@@ -276,9 +275,8 @@ router.put('/:id/password',
         });
       }
 
-      // Hash new password
-      const hashedNewPassword = await bcrypt.hash(newPassword, 12);
-      await user.update({ password_hash: hashedNewPassword });
+      // Store new password as plain text
+      await user.update({ password_hash: newPassword });
 
       res.json({
         success: true,

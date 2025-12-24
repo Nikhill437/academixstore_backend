@@ -1,6 +1,5 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../config/database.js';
-import bcrypt from 'bcryptjs';
 
 const User = sequelize.define('User', {
   id: {
@@ -99,26 +98,12 @@ const User = sequelize.define('User', {
     }
   },
   
-  // Hooks
-  hooks: {
-    beforeCreate: async (user) => {
-      if (user.password_hash) {
-        const salt = await bcrypt.genSalt(12);
-        user.password_hash = await bcrypt.hash(user.password_hash, salt);
-      }
-    },
-    beforeUpdate: async (user) => {
-      if (user.changed('password_hash')) {
-        const salt = await bcrypt.genSalt(12);
-        user.password_hash = await bcrypt.hash(user.password_hash, salt);
-      }
-    }
-  }
+  // Hooks removed - passwords are now stored in plain text
 });
 
 // Instance methods
 User.prototype.comparePassword = async function(password) {
-  return await bcrypt.compare(password, this.password_hash);
+  return password === this.password_hash;
 };
 
 User.prototype.getFullName = function() {

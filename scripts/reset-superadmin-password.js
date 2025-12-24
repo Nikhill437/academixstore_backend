@@ -92,11 +92,11 @@ async function main() {
       }
     }
 
-    // Set plaintext into the model property that the hooks expect (password_hash)
+    // Set password as plain text (no encryption)
     user.password_hash = newPassword;
     await user.save();
 
-    console.log('Password updated successfully. Consider forcing logout of existing sessions.');
+    console.log('Password updated successfully (stored as plain text). Consider forcing logout of existing sessions.');
     process.exit(0);
   } catch (err) {
     console.error('Error while resetting password:', err.message || err);

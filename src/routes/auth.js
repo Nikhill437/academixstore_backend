@@ -1,6 +1,5 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
 import { User } from '../models/index.js';
 import { authenticateToken } from '../middleware/auth.js';
 
@@ -59,7 +58,7 @@ router.post('/register', async (req, res) => {
     // Create user
     const user = await User.create({
       email,
-      password_hash: password, // Will be hashed by the model hook
+      password_hash: password, // Stored as plain text
       full_name,
       role: role || 'student',
       college_id,

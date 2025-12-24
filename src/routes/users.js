@@ -1,5 +1,4 @@
 import express from 'express';
-import bcrypt from 'bcryptjs';
 import { Op } from 'sequelize';
 import { User, College } from '../models/index.js';
 import { requireRoles } from '../middleware/rbac.js';
@@ -202,7 +201,7 @@ router.put('/:id/password', async (req, res) => {
 
     // Verify current password (unless admin is changing someone else's password)
     if (id === requestingUserId.toString()) {
-      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password_hash);
+      const isCurrentPasswordValid = currentPassword === user.password_hash;
       if (!isCurrentPasswordValid) {
         return res.status(400).json({
           success: false,
@@ -212,9 +211,8 @@ router.put('/:id/password', async (req, res) => {
       }
     }
 
-    // Hash new password
-    const hashedNewPassword = await bcrypt.hash(newPassword, 12);
-    await user.update({ password_hash: hashedNewPassword });
+    // Store new password as plain text
+    await user.update({ password_hash: newPassword });
 
     res.json({
       success: true,

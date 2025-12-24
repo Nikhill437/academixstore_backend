@@ -44,29 +44,23 @@ class BookController {
       }
 
       // Determine which college this book belongs to
-      let bookCollegeId;
+      let bookCollegeId = null;
       
       if (userRole === 'super_admin') {
-        // Super admin must specify college_id in request body
-        if (!college_id) {
-          return res.status(400).json({
-            success: false,
-            message: 'Super admin must specify college_id for the book',
-            error: 'COLLEGE_ID_REQUIRED'
-          });
+        // Super admin can optionally specify college_id in request body
+        if (college_id) {
+          // Verify the college exists if provided
+          const collegeExists = await College.findByPk(college_id);
+          if (!collegeExists || !collegeExists.is_active) {
+            return res.status(400).json({
+              success: false,
+              message: 'Invalid or inactive college specified',
+              error: 'INVALID_COLLEGE'
+            });
+          }
+          bookCollegeId = college_id;
         }
-        
-        // Verify the college exists
-        const collegeExists = await College.findByPk(college_id);
-        if (!collegeExists || !collegeExists.is_active) {
-          return res.status(400).json({
-            success: false,
-            message: 'Invalid or inactive college specified',
-            error: 'INVALID_COLLEGE'
-          });
-        }
-        
-        bookCollegeId = college_id;
+        // If no college_id provided, bookCollegeId remains null (book available to all)
       } else if (userRole === 'college_admin') {
         // College admin can only create books for their own college
         if (!userCollegeId) {

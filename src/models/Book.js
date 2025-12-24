@@ -95,7 +95,7 @@ const Book = sequelize.define('Book', {
   // Access control
   college_id: {
     type: DataTypes.UUID,
-    allowNull: false,
+    allowNull: true, // Allow null for books not associated with any college
     field: 'college_id'
   },
   download_count: {
@@ -136,6 +136,11 @@ const Book = sequelize.define('Book', {
 Book.prototype.isAccessibleBy = function(user) {
   // Super admin has access to all books
   if (user.role === 'super_admin') {
+    return true;
+  }
+  
+  // Books without college_id are global and accessible by all users
+  if (!this.college_id) {
     return true;
   }
   

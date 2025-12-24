@@ -114,10 +114,31 @@ class BookController {
 
     } catch (error) {
       console.error('Create book error:', error);
+      
+      // Provide more detailed error information
+      let errorMessage = 'Failed to create book';
+      let errorCode = 'SERVER_ERROR';
+      
+      // Check for database constraint errors
+      if (error.name === 'SequelizeValidationError') {
+        errorMessage = error.errors.map(e => e.message).join(', ');
+        errorCode = 'VALIDATION_ERROR';
+      } else if (error.name === 'SequelizeDatabaseError') {
+        // Database constraint error - likely the college_id constraint
+        if (error.message.includes('college_books_constraint')) {
+          errorMessage = 'Database constraint error. Please run the migration to allow books without college_id.';
+          errorCode = 'DATABASE_CONSTRAINT_ERROR';
+        } else {
+          errorMessage = `Database error: ${error.message}`;
+          errorCode = 'DATABASE_ERROR';
+        }
+      }
+      
       return res.status(500).json({
         success: false,
-        message: 'Failed to create book',
-        error: 'SERVER_ERROR'
+        message: errorMessage,
+        error: errorCode,
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   }

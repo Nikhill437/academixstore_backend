@@ -1,5 +1,5 @@
 import express from 'express';
-import { Op } from 'sequelize';
+import { Op, Sequelize } from 'sequelize';
 import { User, College } from '../models/index.js';
 import { requireRoles } from '../middleware/rbac.js';
 

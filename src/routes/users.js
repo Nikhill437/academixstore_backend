@@ -1,5 +1,5 @@
 import express from 'express';
-import { Op } from 'sequelize';
+const { Op, Sequelize } = require('sequelize');
 import { User, College } from '../models/index.js';
 import { requireRoles } from '../middleware/rbac.js';
 
@@ -30,7 +30,16 @@ router.get('/', requireRoles(['super_admin', 'college_admin']), async (req, res)
     const users = await User.findAndCountAll({
       where: whereClause,
       attributes: { exclude: ['password_hash'] },
-      include: ['college'],
+      include: [
+        {
+          model: College,
+          as: 'college',
+          required: false, // LEFT JOIN
+          on: {
+            '$User.college_id$': { [Op.eq]: Sequelize.col('college.code') } // join on code
+          }
+        }
+      ],
       limit: parseInt(limit),
       offset: parseInt(offset),
       order: [['created_at', 'DESC']]

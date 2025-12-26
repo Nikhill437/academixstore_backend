@@ -15,8 +15,9 @@ import SystemSettings from './SystemSettings.js';
 const setupAssociations = () => {
   // User - College associations
   User.belongsTo(College, {
-    foreignKey: 'college_id',
-    as: 'college'
+  foreignKey: 'college_id', // column in users table
+  targetKey: 'code',        // column in colleges table
+  as: 'college'
   });
   College.hasMany(User, {
     foreignKey: 'college_id',

@@ -46,9 +46,9 @@ const User = sequelize.define('User', {
   },
   // Admin/Student specific fields
   college_id: {
-    type: DataTypes.UUID,
-    allowNull: true,
-    field: 'college_id'
+  type: DataTypes.STRING(20), // store college code
+  allowNull: true,
+  field: 'college_id'
   },
   student_id: {
     type: DataTypes.STRING(50),

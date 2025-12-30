@@ -61,6 +61,13 @@ const Book = sequelize.define('Book', {
       max: 5
     }
   },
+  rating: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    validate: {
+      min: 0
+    }
+  },
   year: {
     type: DataTypes.INTEGER,
     allowNull: false,

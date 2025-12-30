@@ -89,7 +89,8 @@ class BookController {
         name,
         description,
         authorname,
-        rate,rating,
+        rate: rate ? parseFloat(rate) : 0.0,
+        rating: rating ? parseFloat(rating) : null,
         isbn,
         publisher,
         publication_year: publication_year ? parseInt(publication_year) : null,
@@ -101,7 +102,6 @@ class BookController {
         pages: pages ? parseInt(pages) : null,
         college_id: bookCollegeId,
         created_by: userId,
-        rate: 0.0,
         download_count: 0
       };
 

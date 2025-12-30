@@ -113,6 +113,27 @@ const setupAssociations = () => {
     as: 'sessions'
   });
 
+  Order.belongsTo(User, {
+  foreignKey: 'user_id',
+  as: 'user'
+  });
+
+  Order.belongsTo(Book, {
+    foreignKey: 'book_id',
+    as: 'book'
+  });
+
+  User.hasMany(Order, {
+    foreignKey: 'user_id',
+    as: 'orders'
+  });
+
+  Book.hasMany(Order, {
+    foreignKey: 'book_id',
+    as: 'orders'
+  });
+
+
   // SystemSettings - User (updater) associations
   SystemSettings.belongsTo(User, {
     foreignKey: 'updated_by',

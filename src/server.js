@@ -20,7 +20,7 @@ import subscriptionRoutes from './routes/subscriptions.js';
 import advertisementRoutes from './routes/advertisements.js';
 import systemSettingsRoutes from './routes/systemSettings.js';
 import individualUsersRoutes from './routes/individualUsers.js';
-
+import orderRoutes from './routes/orders.js';
 // Import middleware
 import { authenticateToken } from './middleware/auth.js';
 import errorHandler from './middleware/errorHandler.js';
@@ -119,7 +119,7 @@ app.use('/api/subscriptions', authenticateToken, subscriptionRoutes);
 app.use('/api/advertisements', advertisementRoutes); // Some endpoints are public
 app.use('/api/system-settings', systemSettingsRoutes); // Some endpoints are public
 app.use('/api/individual-users', individualUsersRoutes); // Super admin only
-
+app.use('/api/orders', authenticateToken, orderRoutes);
 
 app.post("/api/upload", upload.single("file"), async (req, res) => {
   try {

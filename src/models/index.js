@@ -1,4 +1,5 @@
 import sequelize from '../config/database.js';
+import { Order, User, Book, sequelize } from '../models/index.js';
 
 // Import all models
 import User from './User.js';
@@ -10,7 +11,7 @@ import Advertisement from './Advertisement.js';
 import BookAccessLog from './BookAccessLog.js';
 import UserSession from './UserSession.js';
 import SystemSettings from './SystemSettings.js';
-
+import Order from './Order.js';
 // Define associations
 const setupAssociations = () => {
   // User - College associations
@@ -182,6 +183,7 @@ export {
   BookAccessLog,
   UserSession,
   SystemSettings,
+  Order,
   testConnection,
   syncModels
 };
@@ -198,6 +200,7 @@ export default {
   BookAccessLog,
   UserSession,
   SystemSettings,
+  Order,
   testConnection,
   syncModels
 };

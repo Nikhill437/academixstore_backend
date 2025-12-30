@@ -90,7 +90,7 @@ class BookController {
         description,
         authorname,
         rate: rate ? parseFloat(rate) : 0.0,
-        rating: rating ? parseFloat(rating) : null,
+        rating: rating ? parseInt(rating) : null,
         isbn,
         publisher,
         publication_year: publication_year ? parseInt(publication_year) : null,

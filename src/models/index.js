@@ -1,5 +1,5 @@
 import sequelize from '../config/database.js';
-import { Order, User, Book, sequelize } from '../models/index.js';
+// import { Order, User, Book, sequelize } from '../models/index.js';
 
 // Import all models
 import User from './User.js';

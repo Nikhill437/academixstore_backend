@@ -20,7 +20,7 @@ import subscriptionRoutes from './routes/subscriptions.js';
 import advertisementRoutes from './routes/advertisements.js';
 import systemSettingsRoutes from './routes/systemSettings.js';
 import individualUsersRoutes from './routes/individualUsers.js';
-import orderRoutes from './routes/orders.js';
+import orderRoutes from './routes/order.js';
 // Import middleware
 import { authenticateToken } from './middleware/auth.js';
 import errorHandler from './middleware/errorHandler.js';

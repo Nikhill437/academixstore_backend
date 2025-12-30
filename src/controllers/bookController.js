@@ -351,106 +351,107 @@ class BookController {
    * Get books based on user role and permissions
    */
   async getBooks(req, res) {
-    try {
-      const userRole = req.user.role;
-      const userId = req.user.id;
-      const userCollegeId = req.user.collegeId;
+  try {
+    const userRole = req.user.role;
+    const userId = req.user.id;
+    const userCollegeId = req.user.collegeId;
 
-      const { category, year, semester } = req.query;
+    const { category, year, semester } = req.query;
 
-      let whereClause = { is_active: true };
-      let includeClause = [
-        {
-          model: User,
-          as: 'creator',
-          attributes: ['id', 'full_name', 'email']
-        }
-      ];
-
-      // Apply role-based filtering
-      switch (userRole) {
-        case 'super_admin':
-          includeClause.push({
-            model: College,
-            as: 'college',
-            attributes: ['id', 'name', 'code']
-          });
-          break;
-
-        case 'college_admin':
-          if (!userCollegeId) {
-            return res.status(400).json({
-              success: false,
-              message: 'College admin must be associated with a college',
-              error: 'NO_COLLEGE_ASSOCIATION'
-            });
-          }
-          whereClause.college_id = userCollegeId;
-          includeClause.push({
-            model: College,
-            as: 'college',
-            attributes: ['id', 'name', 'code']
-          });
-          break;
-
-        case 'student':
-          if (!userCollegeId) {
-            return res.status(400).json({
-              success: false,
-              message: 'Student must be associated with a college',
-              error: 'NO_COLLEGE_ASSOCIATION'
-            });
-          }
-          whereClause.college_id = userCollegeId;
-          break;
-
-        case 'user':
-          includeClause.push({
-            model: College,
-            as: 'college',
-            attributes: ['id', 'name', 'code']
-          });
-          break;
-
-        default:
-          return res.status(403).json({
-            success: false,
-            message: 'Access denied',
-            error: 'INSUFFICIENT_PERMISSIONS'
-          });
+    let whereClause = { is_active: true };
+    let includeClause = [
+      {
+        model: User,
+        as: 'creator',
+        attributes: ['id', 'full_name', 'email']
       }
+    ];
 
-      // Add filters
-      if (category) whereClause.category = category;
-      if (year) whereClause.year = parseInt(year);
-      if (semester) whereClause.semester = parseInt(semester);
+    // Apply role-based filtering
+    switch (userRole) {
+      case 'super_admin':
+        includeClause.push({
+          model: College,
+          as: 'college',
+          attributes: ['id', 'name', 'code']
+        });
+        break;
 
-      const books = await Book.findAll({
-        where: whereClause,
-        include: includeClause,
-        order: [['created_at', 'DESC']]
-      });
-
-      // Add signed URLs to all books
-      const booksWithUrls = books.map(book => this._addSignedUrlsToBook(book));
-
-      return res.json({
-        success: true,
-        data: {
-          books: booksWithUrls,
-          count: booksWithUrls.length
+      case 'college_admin':
+        if (!userCollegeId) {
+          return res.status(400).json({
+            success: false,
+            message: 'College admin must be associated with a college',
+            error: 'NO_COLLEGE_ASSOCIATION'
+          });
         }
-      });
+        whereClause.college_id = userCollegeId;
+        includeClause.push({
+          model: College,
+          as: 'college',
+          attributes: ['id', 'name', 'code']
+        });
+        break;
 
-    } catch (error) {
-      console.error('Get books error:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to retrieve books',
-        error: 'SERVER_ERROR'
-      });
+      case 'student':
+        if (!userCollegeId) {
+          return res.status(400).json({
+            success: false,
+            message: 'Student must be associated with a college',
+            error: 'NO_COLLEGE_ASSOCIATION'
+          });
+        }
+        whereClause.college_id = userCollegeId;
+        break;
+
+      case 'user':
+        includeClause.push({
+          model: College,
+          as: 'college',
+          attributes: ['id', 'name', 'code']
+        });
+        break;
+
+      default:
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied',
+          error: 'INSUFFICIENT_PERMISSIONS'
+        });
     }
+
+    // Add filters
+    if (category) whereClause.category = category;
+    if (year) whereClause.year = parseInt(year);
+    if (semester) whereClause.semester = parseInt(semester);
+
+    const books = await Book.findAll({
+      where: whereClause,
+      include: includeClause,
+      order: [['created_at', 'DESC']]
+    });
+
+    // Add signed URLs to all books - USE .bind(this) to preserve context
+    const booksWithUrls = books.map(this._addSignedUrlsToBook.bind(this));
+
+    return res.json({
+      success: true,
+      data: {
+        books: booksWithUrls,
+        count: booksWithUrls.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Get books error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve books',
+      error: 'SERVER_ERROR',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
+}
 
 
   /**

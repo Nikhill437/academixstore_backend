@@ -33,29 +33,31 @@ router.post('/create', async (req, res) => {
       });
     }
 
-    const price = Number(book.price);
+    const price = Number(book.rate);
+    if (!price || isNaN(price)) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid book price'
+      });
+    }
 
-if (!price || isNaN(price)) {
-  return res.status(400).json({
-    success: false,
-    message: 'Invalid book price'
-  });
-}
+    const amountInPaise = Math.round(price * 100);
 
-const amountInPaise = Math.round(price * 100);
-
-const razorpayOrder = await razorpay.orders.create({
-  amount: amountInPaise,
-  currency: 'INR',
-  receipt: `book_${Date.now()}`,
-});
+    // 2️⃣ Create Razorpay order
+    const razorpayOrder = await razorpay.orders.create({
+      amount: amountInPaise,
+      currency: 'INR',
+      receipt: `book_${Date.now()}`,
+      payment_capture: 1 // auto-capture payment
+    });
 
     // 3️⃣ Save order in DB
     const order = await Order.create({
       user_id: userId,
       book_id: book_id,
       razorpay_order_id: razorpayOrder.id,
-      amount: book.price,
+      amount: price, // rupees
       currency: 'INR',
       status: 'created'
     }, { transaction });
@@ -71,7 +73,7 @@ const razorpayOrder = await razorpay.orders.create({
         razorpay_key: process.env.RAZORPAY_KEY_ID,
         book: {
           id: book.id,
-          title: book.title
+          title: book.name
         }
       }
     });
@@ -85,6 +87,7 @@ const razorpayOrder = await razorpay.orders.create({
     });
   }
 });
+
 
 /**
  * VERIFY PAYMENT

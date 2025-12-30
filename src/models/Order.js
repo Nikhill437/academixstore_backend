@@ -106,7 +106,7 @@ const Order = sequelize.define('Order', {
       fields: ['user_id']
     },
     {
-      fields: ['plan_id']
+      fields: ['book_id']
     },
     {
       fields: ['status']

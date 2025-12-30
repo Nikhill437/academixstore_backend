@@ -18,11 +18,11 @@ router.post('/create', async (req, res) => {
   const transaction = await sequelize.transaction();
   
   try {
-    const { plan_id, notes } = req.body;
+    const { book_id, notes } = req.body;
     const userId = req.user.userId;
 
     // Validate plan
-    const plan = await SubscriptionPlan.findByPk(plan_id);
+    const plan = await SubscriptionPlan.findByPk(book_id);
     if (!plan || !plan.is_active) {
       await transaction.rollback();
       return res.status(404).json({
@@ -65,7 +65,7 @@ router.post('/create', async (req, res) => {
       currency: 'INR',
       receipt: receipt,
       notes: {
-        plan_id: plan_id,
+        book_id: book_id,
         plan_name: plan.name,
         user_id: userId,
         user_email: user.email,
@@ -76,7 +76,7 @@ router.post('/create', async (req, res) => {
     // Create order in database
     const order = await Order.create({
       user_id: userId,
-      plan_id: plan_id,
+      book_id: book_id,
       razorpay_order_id: razorpayOrder.id,
       amount: plan.price,
       currency: 'INR',
@@ -218,7 +218,7 @@ router.post('/verify-payment', async (req, res) => {
 
     const subscription = await UserSubscription.create({
       user_id: userId,
-      plan_id: order.plan_id,
+      book_id: order.book_id,
       start_date: startDate,
       end_date: endDate,
       status: 'active',
@@ -388,7 +388,7 @@ router.get('/', requireRoles(['admin']), async (req, res) => {
     const whereClause = {};
     if (status) whereClause.status = status;
     if (userId) whereClause.user_id = userId;
-    if (planId) whereClause.plan_id = planId;
+    if (planId) whereClause.book_id = planId;
     
     if (startDate || endDate) {
       whereClause.created_at = {};

@@ -319,6 +319,34 @@ class BookController {
     }
   }
 
+  _generatePdfAccessUrl(pdfUrl, expirySeconds = 3600) {
+    if (!pdfUrl) return null;
+    
+    try {
+      // Extract the S3 key from the URL
+      const key = pdfUrl.split('/').slice(-2).join('/');
+      return generateSignedUrl(key, expirySeconds);
+    } catch (error) {
+      console.warn('Failed to generate signed URL:', error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Helper method to add signed URLs to book data
+   */
+  _addSignedUrlsToBook(book) {
+    const bookData = book.toSafeJSON ? book.toSafeJSON() : book.get();
+    
+    // Generate signed URL for PDF access (valid for 1 hour)
+    if (bookData.pdf_url) {
+      bookData.pdf_access_url = this._generatePdfAccessUrl(bookData.pdf_url, 3600);
+      // Remove direct URL for security
+      delete bookData.pdf_url;
+    }
+
+    return bookData;
+  }
   /**
    * Get books based on user role and permissions
    */
@@ -342,7 +370,6 @@ class BookController {
       // Apply role-based filtering
       switch (userRole) {
         case 'super_admin':
-          // Super admin can see all books
           includeClause.push({
             model: College,
             as: 'college',
@@ -351,7 +378,6 @@ class BookController {
           break;
 
         case 'college_admin':
-          // College admin can see books from their college
           if (!userCollegeId) {
             return res.status(400).json({
               success: false,
@@ -368,7 +394,6 @@ class BookController {
           break;
 
         case 'student':
-          // Students can see books in their college
           if (!userCollegeId) {
             return res.status(400).json({
               success: false,
@@ -380,7 +405,6 @@ class BookController {
           break;
 
         case 'user':
-          // Regular users can see all books from all colleges
           includeClause.push({
             model: College,
             as: 'college',
@@ -396,20 +420,10 @@ class BookController {
           });
       }
 
-      // Add category filter
-      if (category) {
-        whereClause.category = category;
-      }
-
-      // Add year filter
-      if (year) {
-        whereClause.year = parseInt(year);
-      }
-
-      // Add semester filter
-      if (semester) {
-        whereClause.semester = parseInt(semester);
-      }
+      // Add filters
+      if (category) whereClause.category = category;
+      if (year) whereClause.year = parseInt(year);
+      if (semester) whereClause.semester = parseInt(semester);
 
       const books = await Book.findAll({
         where: whereClause,
@@ -417,27 +431,14 @@ class BookController {
         order: [['created_at', 'DESC']]
       });
 
-      // Generate signed URLs for students accessing PDFs
-      const booksWithUrls = books.map(book => {
-        const bookData = book.toSafeJSON();
-        
-        // Generate signed URL for PDF access for students and users
-        if (bookData.pdf_url && (userRole === 'student' || userRole === 'user')) {
-          try {
-            const key = bookData.pdf_url.split('/').slice(-2).join('/');
-            bookData.pdf_access_url = generateSignedUrl(key, 3600); // 1 hour expiry
-          } catch (error) {
-            console.warn('Failed to generate signed URL:', error.message);
-          }
-        }
-
-        return bookData;
-      });
+      // Add signed URLs to all books
+      const booksWithUrls = books.map(book => this._addSignedUrlsToBook(book));
 
       return res.json({
         success: true,
         data: {
-          books: booksWithUrls
+          books: booksWithUrls,
+          count: booksWithUrls.length
         }
       });
 
@@ -450,6 +451,7 @@ class BookController {
       });
     }
   }
+
 
   /**
    * Get single book by ID
@@ -493,17 +495,8 @@ class BookController {
         });
       }
 
-      const bookData = book.toSafeJSON();
-
-      // Generate signed URL for PDF access
-      if (bookData.pdf_url && (userRole === 'student' || userRole === 'user')) {
-        try {
-          const key = bookData.pdf_url.split('/').slice(-2).join('/');
-          bookData.pdf_access_url = generateSignedUrl(key, 3600);
-        } catch (error) {
-          console.warn('Failed to generate signed URL:', error.message);
-        }
-      }
+      // Add signed URL
+      const bookData = this._addSignedUrlsToBook(book);
 
       return res.json({
         success: true,
@@ -517,6 +510,69 @@ class BookController {
       return res.status(500).json({
         success: false,
         message: 'Failed to retrieve book',
+        error: 'SERVER_ERROR'
+      });
+    }
+  }
+
+  /**
+   * Get refreshed PDF access URL (when signed URL expires)
+   */
+  async refreshPdfAccessUrl(req, res) {
+    try {
+      const { bookId } = req.params;
+
+      const book = await Book.findByPk(bookId);
+      if (!book) {
+        return res.status(404).json({
+          success: false,
+          message: 'Book not found',
+          error: 'BOOK_NOT_FOUND'
+        });
+      }
+
+      // Check access permissions
+      if (!book.isAccessibleBy(req.user)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied to this book',
+          error: 'ACCESS_DENIED'
+        });
+      }
+
+      if (!book.pdf_url) {
+        return res.status(404).json({
+          success: false,
+          message: 'No PDF available for this book',
+          error: 'NO_PDF'
+        });
+      }
+
+      // Generate new signed URL (valid for 1 hour)
+      const pdfAccessUrl = this._generatePdfAccessUrl(book.pdf_url, 3600);
+
+      if (!pdfAccessUrl) {
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to generate access URL',
+          error: 'URL_GENERATION_FAILED'
+        });
+      }
+
+      return res.json({
+        success: true,
+        data: {
+          book_id: bookId,
+          pdf_access_url: pdfAccessUrl,
+          expires_in: 3600
+        }
+      });
+
+    } catch (error) {
+      console.error('Refresh PDF URL error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to refresh PDF access URL',
         error: 'SERVER_ERROR'
       });
     }

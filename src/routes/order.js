@@ -33,19 +33,22 @@ router.post('/create', async (req, res) => {
       });
     }
 
-    const amountInPaise = Math.round(book.price * 100);
+    const price = Number(book.price);
 
-    // 2️⃣ Create Razorpay order
-    const razorpayOrder = await razorpay.orders.create({
-      amount: amountInPaise,
-      currency: 'INR',
-      receipt: `book_${Date.now()}`,
-      notes: {
-        book_id,
-        user_id: userId,
-        book_title: book.title
-      }
-    });
+if (!price || isNaN(price)) {
+  return res.status(400).json({
+    success: false,
+    message: 'Invalid book price'
+  });
+}
+
+const amountInPaise = Math.round(price * 100);
+
+const razorpayOrder = await razorpay.orders.create({
+  amount: amountInPaise,
+  currency: 'INR',
+  receipt: `book_${Date.now()}`,
+});
 
     // 3️⃣ Save order in DB
     const order = await Order.create({

@@ -54,11 +54,17 @@ const Book = sequelize.define('Book', {
     allowNull: true
   },
   rate: {
-    type: DataTypes.DECIMAL(2,1),
-    defaultValue: 0.0,
+  type: DataTypes.INTEGER,
+  defaultValue: 0.0,
+  validate: {
+    min: 0
+  }
+  },
+  rating: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
     validate: {
-      min: 0,
-      max: 5
+      min: 0
     }
   },
   rating: {

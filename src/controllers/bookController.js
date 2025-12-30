@@ -431,19 +431,40 @@ class BookController {
       order: [['created_at', 'DESC']]
     });
 
-    // Add signed URLs to all books - inline implementation
+    // Helper function to extract S3 key from URL
+    const extractS3Key = (url) => {
+      try {
+        const urlObj = new URL(url);
+        let key = urlObj.pathname;
+        if (key.startsWith('/')) {
+          key = key.substring(1);
+        }
+        return key;
+      } catch (error) {
+        console.error('Failed to parse S3 URL:', error);
+        const parts = url.split('.amazonaws.com/');
+        return parts.length > 1 ? parts[1] : null;
+      }
+    };
+
+    // Add signed URLs to all books
     const booksWithUrls = books.map(book => {
       const bookData = book.toSafeJSON ? book.toSafeJSON() : book.get();
       
       // Generate signed URL for PDF access (valid for 1 hour)
       if (bookData.pdf_url) {
         try {
-          const key = bookData.pdf_url.split('/').slice(-2).join('/');
-          bookData.pdf_access_url = generateSignedUrl(key, 3600);
+          const key = extractS3Key(bookData.pdf_url);
+          if (key) {
+            bookData.pdf_access_url = generateSignedUrl(key, 3600);
+            console.log(`Generated signed URL for book ${bookData.id}, key: ${key}`);
+          } else {
+            console.warn(`Failed to extract S3 key from URL: ${bookData.pdf_url}`);
+          }
           // Remove direct URL for security
           delete bookData.pdf_url;
         } catch (error) {
-          console.warn('Failed to generate signed URL:', error.message);
+          console.error('Failed to generate signed URL:', error);
         }
       }
 
@@ -512,16 +533,37 @@ class BookController {
       });
     }
 
-    // Add signed URL - inline implementation
+    // Helper function to extract S3 key
+    const extractS3Key = (url) => {
+      try {
+        const urlObj = new URL(url);
+        let key = urlObj.pathname;
+        if (key.startsWith('/')) {
+          key = key.substring(1);
+        }
+        return key;
+      } catch (error) {
+        console.error('Failed to parse S3 URL:', error);
+        const parts = url.split('.amazonaws.com/');
+        return parts.length > 1 ? parts[1] : null;
+      }
+    };
+
+    // Add signed URL
     const bookData = book.toSafeJSON ? book.toSafeJSON() : book.get();
     
     if (bookData.pdf_url) {
       try {
-        const key = bookData.pdf_url.split('/').slice(-2).join('/');
-        bookData.pdf_access_url = generateSignedUrl(key, 3600);
+        const key = extractS3Key(bookData.pdf_url);
+        if (key) {
+          bookData.pdf_access_url = generateSignedUrl(key, 3600);
+          console.log(`Generated signed URL for book ${bookData.id}, key: ${key}`);
+        } else {
+          console.warn(`Failed to extract S3 key from URL: ${bookData.pdf_url}`);
+        }
         delete bookData.pdf_url;
       } catch (error) {
-        console.warn('Failed to generate signed URL:', error.message);
+        console.error('Failed to generate signed URL:', error);
       }
     }
 

@@ -431,8 +431,24 @@ class BookController {
       order: [['created_at', 'DESC']]
     });
 
-    // Add signed URLs to all books - USE .bind(this) to preserve context
-    const booksWithUrls = books.map(this._addSignedUrlsToBook.bind(this));
+    // Add signed URLs to all books - inline implementation
+    const booksWithUrls = books.map(book => {
+      const bookData = book.toSafeJSON ? book.toSafeJSON() : book.get();
+      
+      // Generate signed URL for PDF access (valid for 1 hour)
+      if (bookData.pdf_url) {
+        try {
+          const key = bookData.pdf_url.split('/').slice(-2).join('/');
+          bookData.pdf_access_url = generateSignedUrl(key, 3600);
+          // Remove direct URL for security
+          delete bookData.pdf_url;
+        } catch (error) {
+          console.warn('Failed to generate signed URL:', error.message);
+        }
+      }
+
+      return bookData;
+    });
 
     return res.json({
       success: true,
@@ -458,126 +474,142 @@ class BookController {
    * Get single book by ID
    */
   async getBook(req, res) {
-    try {
-      const { bookId } = req.params;
-      const userRole = req.user.role;
-      const userId = req.user.id;
-      const userCollegeId = req.user.collegeId;
+  try {
+    const { bookId } = req.params;
+    const userRole = req.user.role;
+    const userId = req.user.id;
+    const userCollegeId = req.user.collegeId;
 
-      const book = await Book.findByPk(bookId, {
-        include: [
-          {
-            model: User,
-            as: 'creator',
-            attributes: ['id', 'full_name', 'email']
-          },
-          {
-            model: College,
-            as: 'college',
-            attributes: ['id', 'name', 'code']
-          }
-        ]
-      });
-
-      if (!book) {
-        return res.status(404).json({
-          success: false,
-          message: 'Book not found',
-          error: 'BOOK_NOT_FOUND'
-        });
-      }
-
-      // Check access permissions
-      if (!book.isAccessibleBy(req.user)) {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied to this book',
-          error: 'ACCESS_DENIED'
-        });
-      }
-
-      // Add signed URL
-      const bookData = this._addSignedUrlsToBook(book);
-
-      return res.json({
-        success: true,
-        data: {
-          book: bookData
+    const book = await Book.findByPk(bookId, {
+      include: [
+        {
+          model: User,
+          as: 'creator',
+          attributes: ['id', 'full_name', 'email']
+        },
+        {
+          model: College,
+          as: 'college',
+          attributes: ['id', 'name', 'code']
         }
-      });
+      ]
+    });
 
-    } catch (error) {
-      console.error('Get book error:', error);
-      return res.status(500).json({
+    if (!book) {
+      return res.status(404).json({
         success: false,
-        message: 'Failed to retrieve book',
-        error: 'SERVER_ERROR'
+        message: 'Book not found',
+        error: 'BOOK_NOT_FOUND'
       });
     }
+
+    // Check access permissions
+    if (!book.isAccessibleBy(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied to this book',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Add signed URL - inline implementation
+    const bookData = book.toSafeJSON ? book.toSafeJSON() : book.get();
+    
+    if (bookData.pdf_url) {
+      try {
+        const key = bookData.pdf_url.split('/').slice(-2).join('/');
+        bookData.pdf_access_url = generateSignedUrl(key, 3600);
+        delete bookData.pdf_url;
+      } catch (error) {
+        console.warn('Failed to generate signed URL:', error.message);
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        book: bookData
+      }
+    });
+
+  } catch (error) {
+    console.error('Get book error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve book',
+      error: 'SERVER_ERROR'
+    });
   }
+}
 
   /**
    * Get refreshed PDF access URL (when signed URL expires)
    */
   async refreshPdfAccessUrl(req, res) {
-    try {
-      const { bookId } = req.params;
+  try {
+    const { bookId } = req.params;
 
-      const book = await Book.findByPk(bookId);
-      if (!book) {
-        return res.status(404).json({
-          success: false,
-          message: 'Book not found',
-          error: 'BOOK_NOT_FOUND'
-        });
-      }
-
-      // Check access permissions
-      if (!book.isAccessibleBy(req.user)) {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied to this book',
-          error: 'ACCESS_DENIED'
-        });
-      }
-
-      if (!book.pdf_url) {
-        return res.status(404).json({
-          success: false,
-          message: 'No PDF available for this book',
-          error: 'NO_PDF'
-        });
-      }
-
-      // Generate new signed URL (valid for 1 hour)
-      const pdfAccessUrl = this._generatePdfAccessUrl(book.pdf_url, 3600);
-
-      if (!pdfAccessUrl) {
-        return res.status(500).json({
-          success: false,
-          message: 'Failed to generate access URL',
-          error: 'URL_GENERATION_FAILED'
-        });
-      }
-
-      return res.json({
-        success: true,
-        data: {
-          book_id: bookId,
-          pdf_access_url: pdfAccessUrl,
-          expires_in: 3600
-        }
-      });
-
-    } catch (error) {
-      console.error('Refresh PDF URL error:', error);
-      return res.status(500).json({
+    const book = await Book.findByPk(bookId);
+    if (!book) {
+      return res.status(404).json({
         success: false,
-        message: 'Failed to refresh PDF access URL',
-        error: 'SERVER_ERROR'
+        message: 'Book not found',
+        error: 'BOOK_NOT_FOUND'
       });
     }
+
+    // Check access permissions
+    if (!book.isAccessibleBy(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied to this book',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    if (!book.pdf_url) {
+      return res.status(404).json({
+        success: false,
+        message: 'No PDF available for this book',
+        error: 'NO_PDF'
+      });
+    }
+
+    // Generate new signed URL (valid for 1 hour)
+    let pdfAccessUrl = null;
+    try {
+      const key = book.pdf_url.split('/').slice(-2).join('/');
+      pdfAccessUrl = generateSignedUrl(key, 3600);
+    } catch (error) {
+      console.warn('Failed to generate signed URL:', error.message);
+    }
+
+    if (!pdfAccessUrl) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to generate access URL',
+        error: 'URL_GENERATION_FAILED'
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        book_id: bookId,
+        pdf_access_url: pdfAccessUrl,
+        expires_in: 3600
+      }
+    });
+
+  } catch (error) {
+    console.error('Refresh PDF URL error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to refresh PDF access URL',
+      error: 'SERVER_ERROR'
+    });
   }
+}
 
   /**
    * Log book access (for analytics)

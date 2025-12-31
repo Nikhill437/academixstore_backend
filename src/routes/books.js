@@ -40,6 +40,36 @@ router.get('/',
   bookController.getBooks
 );
 
+
+/**
+ * Student-specific routes
+ */
+
+// Get books for student's year and college
+router.get('/my-books', 
+  authenticateToken, 
+  requireRoles(['student']),
+  async (req, res) => {
+    // Add student-specific filters to query
+    req.query.student_books = true;
+    return bookController.getBooks(req, res);
+  }
+);
+
+/**
+ * Individual User routes
+ */
+
+// Get books for individual users (all books from all colleges)
+router.get('/user-books', 
+  authenticateToken, 
+  requireRoles(['user']),
+  async (req, res) => {
+    // Individual users can see all books
+    return bookController.getBooks(req, res);
+  }
+);
+
 // Get single book by ID
 router.get('/:bookId', 
   authenticateToken, 
@@ -141,36 +171,6 @@ router.post('/:bookId/upload-both',
     }
   }
 );
-
-/**
- * Student-specific routes
- */
-
-// Get books for student's year and college
-router.get('/my-books', 
-  authenticateToken, 
-  requireRoles(['student']),
-  async (req, res) => {
-    // Add student-specific filters to query
-    req.query.student_books = true;
-    return bookController.getBooks(req, res);
-  }
-);
-
-/**
- * Individual User routes
- */
-
-// Get books for individual users (all books from all colleges)
-router.get('/user-books', 
-  authenticateToken, 
-  requireRoles(['user']),
-  async (req, res) => {
-    // Individual users can see all books
-    return bookController.getBooks(req, res);
-  }
-);
-
 
 /**
  * Search and filtering routes

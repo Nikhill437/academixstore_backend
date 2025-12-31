@@ -139,38 +139,30 @@ const Book = sequelize.define('Book', {
 
 // Instance methods
 
-Book.prototype.isAccessibleBy = function(user) {
-  // Super admin has access to all books
-  if (user.role === 'super_admin') {
-    return true;
-  }
-  
-  // Books without college_id are global and accessible by all users
-  if (!this.college_id) {
-    return true;
-  }
-  
-  // College books - accessible by students/admins of same college
+Book.prototype.isAccessibleBy = function (user) {
+  // Super admin → full access
+  if (user.role === 'super_admin') return true;
+
+  // Global books → everyone
+  if (!this.college_id) return true;
+
+  // College-based books
   if (this.college_id) {
-    if (user.college_id !== this.college_id) {
-      return false;
-    }
-    
-    // College admins can access all books in their college
-    if (user.role === 'college_admin') {
+    if (!user.college_id) return false;
+    if (user.college_id !== this.college_id) return false;
+
+    if (
+      user.role === 'college_admin' ||
+      user.role === 'student' ||
+      user.role === 'user'   // ✅ ADD THIS
+    ) {
       return true;
     }
-    
-    // Students can access books in their college
-    if (user.role === 'student') {
-      return true;
-    }
-    
-    return true;
   }
-  
+
   return false;
 };
+
 
 Book.prototype.toSafeJSON = function() {
   const book = this.toJSON();

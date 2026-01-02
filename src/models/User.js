@@ -61,6 +61,10 @@ const User = sequelize.define('User', {
     allowNull: true,
     field: 'mobile'
   },
+  year:{
+    type: DataTypes.STRING(20),
+    allowNull: true
+  },
   profile_image_url: {
     type: DataTypes.TEXT,
     allowNull: true,

@@ -68,7 +68,7 @@ const Book = sequelize.define('Book', {
     }
   },
   year: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.STRING,
     allowNull: false,
     validate: {
       min: 2020,

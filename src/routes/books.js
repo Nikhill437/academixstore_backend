@@ -16,6 +16,61 @@ import bookController from '../controllers/bookController.js';
 const router = express.Router();
 
 /**
+ * Diagnostic routes
+ */
+
+// Test S3 URL generation (for debugging)
+router.get('/debug/test-s3-url', authenticateToken, async (req, res) => {
+  try {
+    const { extractS3Key, generateSignedUrl, generatePublicUrl, isS3Configured } = await import('../config/aws.js');
+    
+    const testUrl = req.query.url || 'https://academixstore.s3.ap-south-1.amazonaws.com/books/covers/test.jpg';
+    
+    const result = {
+      s3_configured: isS3Configured(),
+      test_url: testUrl,
+      extracted_key: null,
+      signed_url: null,
+      public_url: null,
+      error: null
+    };
+    
+    try {
+      result.extracted_key = extractS3Key(testUrl);
+      
+      if (result.extracted_key) {
+        try {
+          result.signed_url = generateSignedUrl(result.extracted_key, 3600);
+        } catch (e) {
+          result.error = `Signed URL generation failed: ${e.message}`;
+        }
+        
+        try {
+          result.public_url = generatePublicUrl(result.extracted_key);
+        } catch (e) {
+          result.error = `Public URL generation failed: ${e.message}`;
+        }
+      } else {
+        result.error = 'Failed to extract S3 key from URL';
+      }
+    } catch (e) {
+      result.error = e.message;
+    }
+    
+    return res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Debug endpoint error',
+      error: error.message
+    });
+  }
+});
+
+/**
  * Public routes (no authentication required)
  */
 

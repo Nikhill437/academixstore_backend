@@ -1,7 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import Razorpay from 'razorpay';
-import { Order, Book, sequelize } from '../models/index.js';
+import { Order, Book, UserSubscription, SubscriptionPlan, sequelize } from '../models/index.js';
 import { requireRoles } from '../middleware/rbac.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { generateSignedUrl, extractS3Key } from '../config/aws.js';
@@ -138,12 +138,49 @@ router.post('/verify-payment', async (req, res) => {
       paid_at: new Date()
     }, { transaction });
 
+    // Create 6-month subscription for the purchased book
+    const currentDate = new Date();
+    const subscriptionEndDate = new Date(currentDate);
+    subscriptionEndDate.setMonth(subscriptionEndDate.getMonth() + 6);
+
+    // Find or create a "Book Purchase" subscription plan
+    let bookPurchasePlan = await SubscriptionPlan.findOne({
+      where: { name: 'Book Purchase - 6 Months' }
+    });
+
+    if (!bookPurchasePlan) {
+      bookPurchasePlan = await SubscriptionPlan.create({
+        name: 'Book Purchase - 6 Months',
+        description: 'Individual book purchase with 6 months access',
+        price: 0, // Price is already paid through the order
+        duration_months: 6,
+        features: JSON.stringify(['6 months access to purchased book', 'Download for offline reading']),
+        is_active: true
+      }, { transaction });
+    }
+
+    // Create user subscription for this book
+    await UserSubscription.create({
+      user_id: userId,
+      plan_id: bookPurchasePlan.id,
+      status: 'active',
+      start_date: currentDate,
+      end_date: subscriptionEndDate,
+      payment_reference: razorpay_payment_id,
+      auto_renewal: false
+    }, { transaction });
+
     await transaction.commit();
+
+    console.log(`[Order ${order.id}] Created 6-month subscription for user ${userId}, book ${order.book_id}, expires: ${subscriptionEndDate.toISOString()}`);
 
     res.json({
       success: true,
       message: 'Payment successful',
-      data: { orderId: order.id }
+      data: { 
+        orderId: order.id,
+        subscriptionEndDate: subscriptionEndDate.toISOString()
+      }
     });
 
   } catch (error) {
@@ -208,12 +245,38 @@ router.get('/my-purchases',
         order: [['paid_at', 'DESC'], ['created_at', 'DESC']]
       });
 
+      // Get user subscriptions to check access validity
+      const userSubscriptions = await UserSubscription.findAll({
+        where: {
+          user_id: userId,
+          status: 'active'
+        },
+        include: [
+          {
+            model: SubscriptionPlan,
+            as: 'plan',
+            attributes: ['name', 'duration_months']
+          }
+        ]
+      });
+
       // Format response with signed URLs
       const purchases = orders.rows.map(order => {
         const orderData = order.toJSON();
         
-        // Generate signed URL for PDF access (valid for 1 hour)
-        if (orderData.book && orderData.book.pdf_url) {
+        // Find subscription for this order
+        const subscription = userSubscriptions.find(sub => 
+          sub.payment_reference === orderData.razorpay_payment_id
+        );
+
+        // Check if subscription is still valid
+        const now = new Date();
+        const isSubscriptionActive = subscription && 
+          subscription.status === 'active' && 
+          new Date(subscription.end_date) > now;
+
+        // Generate signed URL for PDF access (valid for 1 hour) only if subscription is active
+        if (orderData.book && orderData.book.pdf_url && isSubscriptionActive) {
           try {
             const key = extractS3Key(orderData.book.pdf_url);
             if (key) {
@@ -227,6 +290,9 @@ router.get('/my-purchases',
           } catch (error) {
             console.error(`[Order ${orderData.id}] Failed to generate signed URL:`, error);
           }
+        } else {
+          // Remove PDF URL if subscription expired
+          delete orderData.book.pdf_url;
         }
 
         return {
@@ -238,7 +304,16 @@ router.get('/my-purchases',
           payment_method: orderData.payment_method,
           purchased_at: orderData.paid_at || orderData.created_at,
           razorpay_order_id: orderData.razorpay_order_id,
-          razorpay_payment_id: orderData.razorpay_payment_id
+          razorpay_payment_id: orderData.razorpay_payment_id,
+          // Add subscription info
+          subscription: subscription ? {
+            status: subscription.status,
+            start_date: subscription.start_date,
+            end_date: subscription.end_date,
+            is_active: isSubscriptionActive,
+            days_remaining: isSubscriptionActive ? 
+              Math.ceil((new Date(subscription.end_date) - now) / (1000 * 60 * 60 * 24)) : 0
+          } : null
         };
       });
 

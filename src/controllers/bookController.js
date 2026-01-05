@@ -1,4 +1,4 @@
-import { Book, College, User, BookAccessLog } from '../models/index.js';
+import { Book, College, User, BookAccessLog, Order } from '../models/index.js';
 import { Op } from 'sequelize';
 import fileUploadService from '../services/fileUploadService.js';
 import { generateSignedUrl } from '../config/aws.js';
@@ -347,6 +347,74 @@ class BookController {
 
     return bookData;
   }
+
+  /**
+   * Helper method to check purchase status for books
+   * @param {string} userId - The user ID to check purchases for
+   * @param {Array<string>} bookIds - Array of book IDs to check
+   * @returns {Promise<Set<string>>} Set of purchased book IDs
+   */
+  async _checkPurchaseStatus(userId, bookIds) {
+    try {
+      // If no book IDs provided, return empty set
+      if (!bookIds || bookIds.length === 0) {
+        return new Set();
+      }
+
+      // Query orders table for paid orders in a single query
+      const purchasedOrders = await Order.findAll({
+        where: {
+          user_id: userId,
+          book_id: { [Op.in]: bookIds },
+          status: 'paid'
+        },
+        attributes: ['book_id'],
+        raw: true
+      });
+
+      // Return Set of purchased book IDs for O(1) lookup
+      return new Set(purchasedOrders.map(order => order.book_id));
+    } catch (error) {
+      // Log error but don't fail the request
+      console.error('Error checking purchase status:', error);
+      console.error('User ID:', userId, 'Book IDs:', bookIds);
+      
+      // Return empty Set on error (default to not purchased)
+      return new Set();
+    }
+  }
+
+  /**
+   * Helper method to add purchased field to book objects
+   * @param {Object|Array<Object>} books - Single book object or array of books
+   * @param {string} userId - The authenticated user's ID
+   * @param {string} userRole - The user's role
+   * @returns {Promise<Object|Array<Object>>} Book(s) with purchased field added
+   */
+  async _addPurchasedField(books, userId, userRole) {
+    // Handle both single book and array of books
+    const isArray = Array.isArray(books);
+    const booksArray = isArray ? books : [books];
+
+    // For non-'user' roles, set purchased = 0 for all books
+    if (userRole !== 'user') {
+      booksArray.forEach(book => {
+        book.purchased = 0;
+      });
+      return isArray ? booksArray : booksArray[0];
+    }
+
+    // For 'user' role, check purchase status
+    const bookIds = booksArray.map(book => book.id);
+    const purchasedBookIds = await this._checkPurchaseStatus(userId, bookIds);
+
+    // Add purchased field based on purchase status
+    booksArray.forEach(book => {
+      book.purchased = purchasedBookIds.has(book.id) ? 1 : 0;
+    });
+
+    return isArray ? booksArray : booksArray[0];
+  }
   /**
    * Get books based on user role and permissions
    */
@@ -471,11 +539,14 @@ class BookController {
       return bookData;
     });
 
+    // Add purchased field to all books
+    const booksWithPurchased = await this._addPurchasedField(booksWithUrls, userId, userRole);
+
     return res.json({
       success: true,
       data: {
-        books: booksWithUrls,
-        count: booksWithUrls.length
+        books: booksWithPurchased,
+        count: booksWithPurchased.length
       }
     });
 
@@ -567,10 +638,13 @@ class BookController {
       }
     }
 
+    // Add purchased field
+    const bookWithPurchased = await this._addPurchasedField(bookData, userId, userRole);
+
     return res.json({
       success: true,
       data: {
-        book: bookData
+        book: bookWithPurchased
       }
     });
 

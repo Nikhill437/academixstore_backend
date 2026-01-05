@@ -1,11 +1,10 @@
 import express from 'express';
 import crypto from 'crypto';
 import Razorpay from 'razorpay';
-import { Op } from 'sequelize';
-import { Order, Book, User, sequelize } from '../models/index.js';
+import { Order, Book, sequelize } from '../models/index.js';
 import { requireRoles } from '../middleware/rbac.js';
 import { authenticateToken } from '../middleware/auth.js';
-import { generateSignedUrl } from '../config/aws.js';
+import { generateSignedUrl, extractS3Key } from '../config/aws.js';
 
 const router = express.Router();
 
@@ -209,18 +208,6 @@ router.get('/my-purchases',
         order: [['paid_at', 'DESC'], ['created_at', 'DESC']]
       });
 
-      // Helper function to extract S3 key from URL
-      const extractS3Key = (url) => {
-        if (!url) return null;
-        try {
-          const urlParts = url.split('/');
-          return urlParts.slice(-2).join('/');
-        } catch (error) {
-          console.error('Error extracting S3 key:', error);
-          return null;
-        }
-      };
-
       // Format response with signed URLs
       const purchases = orders.rows.map(order => {
         const orderData = order.toJSON();
@@ -230,12 +217,15 @@ router.get('/my-purchases',
           try {
             const key = extractS3Key(orderData.book.pdf_url);
             if (key) {
+              console.log(`[Order ${orderData.id}] Extracted S3 key: ${key} from URL: ${orderData.book.pdf_url}`);
               orderData.book.pdf_access_url = generateSignedUrl(key, 3600);
+            } else {
+              console.error(`[Order ${orderData.id}] Failed to extract S3 key from URL: ${orderData.book.pdf_url}`);
             }
             // Remove direct PDF URL for security
             delete orderData.book.pdf_url;
           } catch (error) {
-            console.error('Failed to generate signed URL:', error);
+            console.error(`[Order ${orderData.id}] Failed to generate signed URL:`, error);
           }
         }
 

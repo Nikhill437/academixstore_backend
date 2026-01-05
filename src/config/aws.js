@@ -135,4 +135,90 @@ export const generatePublicUrl = (key) => {
   return `https://${awsConfig.bucket}.s3.${awsConfig.region}.amazonaws.com/${key}`;
 };
 
-export default { s3, S3_CONFIG, isS3Configured, testS3Connection };
+/**
+ * Extract S3 key from a full S3 URL
+ * 
+ * Supports multiple S3 URL formats:
+ * - Virtual-hosted-style: https://bucket-name.s3.region.amazonaws.com/path/to/file.pdf
+ * - Path-style: https://s3.region.amazonaws.com/bucket-name/path/to/file.pdf
+ * - Legacy format: https://s3.amazonaws.com/bucket-name/path/to/file.pdf
+ * 
+ * @param {string} url - Full S3 URL
+ * @returns {string|null} - Extracted S3 key (object path) or null if invalid
+ * 
+ * @example
+ * // Virtual-hosted-style URL
+ * extractS3Key('https://mybucket.s3.us-east-1.amazonaws.com/folder/file.pdf')
+ * // Returns: 'folder/file.pdf'
+ * 
+ * @example
+ * // Path-style URL
+ * extractS3Key('https://s3.us-east-1.amazonaws.com/mybucket/folder/file.pdf')
+ * // Returns: 'folder/file.pdf'
+ * 
+ * @example
+ * // URL with query parameters (pre-signed URL)
+ * extractS3Key('https://mybucket.s3.us-east-1.amazonaws.com/folder/file.pdf?X-Amz-Algorithm=...')
+ * // Returns: 'folder/file.pdf'
+ */
+export const extractS3Key = (url) => {
+  // Handle null, undefined, or non-string inputs
+  if (!url || typeof url !== 'string') {
+    return null;
+  }
+
+  try {
+    // Parse the URL
+    const urlObj = new URL(url);
+    
+    // Get the pathname and remove leading slash
+    let pathname = urlObj.pathname;
+    if (pathname.startsWith('/')) {
+      pathname = pathname.substring(1);
+    }
+
+    // If pathname is empty or just whitespace, return null
+    if (!pathname || pathname.trim() === '') {
+      return null;
+    }
+
+    // Decode URL-encoded characters
+    pathname = decodeURIComponent(pathname);
+
+    // Check if this is a path-style URL (hostname contains s3 but not bucket name)
+    // Path-style format: s3.region.amazonaws.com/bucket-name/key or s3.amazonaws.com/bucket-name/key
+    const hostname = urlObj.hostname.toLowerCase();
+    
+    if (hostname.startsWith('s3.') || hostname === 's3.amazonaws.com') {
+      // Path-style URL: first segment is bucket name, rest is the key
+      const segments = pathname.split('/');
+      if (segments.length < 2) {
+        // Invalid path-style URL (no key after bucket name)
+        return null;
+      }
+      // Remove the bucket name (first segment) and return the rest as the key
+      const key = segments.slice(1).join('/');
+      // Check if key is empty or just whitespace
+      if (!key || key.trim() === '') {
+        return null;
+      }
+      return key;
+    }
+    
+    // Virtual-hosted-style URL: entire pathname is the key
+    // Format: bucket-name.s3.region.amazonaws.com/key
+    if (hostname.includes('.s3.') || hostname.includes('.s3-')) {
+      return pathname;
+    }
+
+    // If we can't determine the format, return null
+    return null;
+
+  } catch (error) {
+    // Invalid URL format
+    console.warn('Failed to parse S3 URL:', url, error.message);
+    return null;
+  }
+};
+
+export default { s3, S3_CONFIG, isS3Configured, testS3Connection, extractS3Key };

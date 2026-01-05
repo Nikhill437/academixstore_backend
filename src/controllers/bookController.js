@@ -1,7 +1,7 @@
 import { Book, College, User, BookAccessLog, Order } from '../models/index.js';
 import { Op } from 'sequelize';
 import fileUploadService from '../services/fileUploadService.js';
-import { generateSignedUrl } from '../config/aws.js';
+import { generateSignedUrl, extractS3Key } from '../config/aws.js';
 
 /**
  * Book Controller
@@ -333,9 +333,10 @@ class BookController {
   }
 
   /**
-   * Helper method to add signed URLs to book data
+   * Helper method to add file URLs (PDFs and cover images) to book data
+   * Generates signed URLs for secure, temporary access to S3 files
    */
-  _addSignedUrlsToBook(book) {
+  _addFileUrlsToBook(book) {
     const bookData = book.toSafeJSON ? book.toSafeJSON() : book.get();
     
     // Generate signed URL for PDF access (valid for 1 hour)
@@ -343,6 +344,23 @@ class BookController {
       bookData.pdf_access_url = this._generatePdfAccessUrl(bookData.pdf_url, 3600);
       // Remove direct URL for security
       delete bookData.pdf_url;
+    }
+
+    // Generate signed URL for cover image access (valid for 1 hour)
+    if (bookData.cover_image_url) {
+      try {
+        const key = extractS3Key(bookData.cover_image_url);
+        if (key) {
+          bookData.cover_image_access_url = generateSignedUrl(key, 3600);
+          console.log(`Generated signed URL for cover image, book ${bookData.id}, key: ${key}`);
+        } else {
+          console.warn(`Failed to extract S3 key from cover URL: ${bookData.cover_image_url}`);
+        }
+      } catch (error) {
+        console.warn('Failed to generate cover image signed URL:', error.message);
+      }
+      // Remove direct URL for security
+      delete bookData.cover_image_url;
     }
 
     return bookData;
@@ -554,45 +572,8 @@ class BookController {
       order: [['created_at', 'DESC']]
     });
 
-    // Helper function to extract S3 key from URL
-    const extractS3Key = (url) => {
-      try {
-        const urlObj = new URL(url);
-        let key = urlObj.pathname;
-        if (key.startsWith('/')) {
-          key = key.substring(1);
-        }
-        return key;
-      } catch (error) {
-        console.error('Failed to parse S3 URL:', error);
-        const parts = url.split('.amazonaws.com/');
-        return parts.length > 1 ? parts[1] : null;
-      }
-    };
-
-    // Add signed URLs to all books
-    const booksWithUrls = books.map(book => {
-      const bookData = book.toSafeJSON ? book.toSafeJSON() : book.get();
-      
-      // Generate signed URL for PDF access (valid for 1 hour)
-      if (bookData.pdf_url) {
-        try {
-          const key = extractS3Key(bookData.pdf_url);
-          if (key) {
-            bookData.pdf_access_url = generateSignedUrl(key, 3600);
-            console.log(`Generated signed URL for book ${bookData.id}, key: ${key}`);
-          } else {
-            console.warn(`Failed to extract S3 key from URL: ${bookData.pdf_url}`);
-          }
-          // Remove direct URL for security
-          delete bookData.pdf_url;
-        } catch (error) {
-          console.error('Failed to generate signed URL:', error);
-        }
-      }
-
-      return bookData;
-    });
+    // Add signed URLs to all books (PDFs and cover images)
+    const booksWithUrls = books.map(book => this._addFileUrlsToBook(book));
 
     // Add purchased field to all books
     const booksWithPurchased = await this._addPurchasedField(booksWithUrls, userId, userRole);
@@ -659,39 +640,8 @@ class BookController {
       });
     }
 
-    // Helper function to extract S3 key
-    const extractS3Key = (url) => {
-      try {
-        const urlObj = new URL(url);
-        let key = urlObj.pathname;
-        if (key.startsWith('/')) {
-          key = key.substring(1);
-        }
-        return key;
-      } catch (error) {
-        console.error('Failed to parse S3 URL:', error);
-        const parts = url.split('.amazonaws.com/');
-        return parts.length > 1 ? parts[1] : null;
-      }
-    };
-
-    // Add signed URL
-    const bookData = book.toSafeJSON ? book.toSafeJSON() : book.get();
-    
-    if (bookData.pdf_url) {
-      try {
-        const key = extractS3Key(bookData.pdf_url);
-        if (key) {
-          bookData.pdf_access_url = generateSignedUrl(key, 3600);
-          console.log(`Generated signed URL for book ${bookData.id}, key: ${key}`);
-        } else {
-          console.warn(`Failed to extract S3 key from URL: ${bookData.pdf_url}`);
-        }
-        delete bookData.pdf_url;
-      } catch (error) {
-        console.error('Failed to generate signed URL:', error);
-      }
-    }
+    // Add signed URLs for PDF and cover image
+    const bookData = this._addFileUrlsToBook(book);
 
     // Add purchased field
     const bookWithPurchased = await this._addPurchasedField(bookData, userId, userRole);

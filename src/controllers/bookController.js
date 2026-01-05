@@ -352,12 +352,16 @@ class BookController {
         const key = extractS3Key(bookData.cover_image_url);
         if (key) {
           bookData.cover_image_access_url = generateSignedUrl(key, 3600);
-          console.log(`Generated signed URL for cover image, book ${bookData.id}, key: ${key}`);
+          console.log(`✅ Generated signed URL for cover image, book ${bookData.id}, key: ${key}`);
         } else {
-          console.warn(`Failed to extract S3 key from cover URL: ${bookData.cover_image_url}`);
+          console.error(`❌ Failed to extract S3 key from cover URL: ${bookData.cover_image_url}`);
+          // Fallback: try to use the direct URL (will fail if not public)
+          bookData.cover_image_access_url = bookData.cover_image_url;
         }
       } catch (error) {
-        console.warn('Failed to generate cover image signed URL:', error.message);
+        console.error('❌ Failed to generate cover image signed URL:', error.message);
+        // Fallback: try to use the direct URL (will fail if not public)
+        bookData.cover_image_access_url = bookData.cover_image_url;
       }
       // Remove direct URL for security
       delete bookData.cover_image_url;

@@ -8,7 +8,7 @@ const router = express.Router();
 // Register new user
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, full_name, role, college_id, student_id, mobile, profile_image_url } = req.body;
+    const { email, password, full_name, role, college_id, student_id, mobile, profile_image_url, year } = req.body;
 
     // Validate role
     const validRoles = ['super_admin', 'college_admin', 'student', 'user'];
@@ -65,6 +65,7 @@ router.post('/register', async (req, res) => {
       student_id,
       mobile,
       profile_image_url,
+      year,
       is_active: true,
       is_verified: false
     });

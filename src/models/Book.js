@@ -148,8 +148,19 @@ Book.prototype.isAccessibleBy = function (user) {
 
   // College-based books
   if (this.college_id) {
-    if (!user.college_id) return false;
-    if (user.college_id !== this.college_id) return false;
+    if (!user.collegeId) return false;
+    
+    // Compare college codes
+    // user.collegeId contains the college code (STRING)
+    // this.college_id contains the college UUID
+    // We need to compare using the college relationship if available
+    const bookCollegeCode = this.college?.code || this.college_id;
+    
+    // If college relationship is loaded, compare codes
+    // Otherwise, compare IDs directly (fallback for backward compatibility)
+    const userCollegeId = user.collegeId;
+    
+    if (bookCollegeCode !== userCollegeId) return false;
 
     // College admin has access to all books in their college
     if (user.role === 'college_admin') {

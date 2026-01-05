@@ -280,19 +280,41 @@ router.get('/my-purchases',
           try {
             const key = extractS3Key(orderData.book.pdf_url);
             if (key) {
-              console.log(`[Order ${orderData.id}] Extracted S3 key: ${key} from URL: ${orderData.book.pdf_url}`);
+              console.log(`[Order ${orderData.id}] Extracted PDF S3 key: ${key} from URL: ${orderData.book.pdf_url}`);
               orderData.book.pdf_access_url = generateSignedUrl(key, 3600);
             } else {
-              console.error(`[Order ${orderData.id}] Failed to extract S3 key from URL: ${orderData.book.pdf_url}`);
+              console.error(`[Order ${orderData.id}] Failed to extract S3 key from PDF URL: ${orderData.book.pdf_url}`);
             }
             // Remove direct PDF URL for security
             delete orderData.book.pdf_url;
           } catch (error) {
-            console.error(`[Order ${orderData.id}] Failed to generate signed URL:`, error);
+            console.error(`[Order ${orderData.id}] Failed to generate PDF signed URL:`, error);
           }
         } else {
           // Remove PDF URL if subscription expired
           delete orderData.book.pdf_url;
+        }
+
+        // Generate signed URL for cover image (valid for 1 hour)
+        if (orderData.book && orderData.book.cover_image_url) {
+          try {
+            const key = extractS3Key(orderData.book.cover_image_url);
+            if (key) {
+              console.log(`[Order ${orderData.id}] ✅ Extracted cover image S3 key: ${key} from URL: ${orderData.book.cover_image_url}`);
+              orderData.book.cover_image_access_url = generateSignedUrl(key, 3600);
+            } else {
+              console.error(`[Order ${orderData.id}] ❌ Failed to extract S3 key from cover image URL: ${orderData.book.cover_image_url}`);
+              // Fallback: use direct URL (will work if bucket policy is set)
+              orderData.book.cover_image_access_url = orderData.book.cover_image_url;
+            }
+            // Remove direct cover image URL for security
+            delete orderData.book.cover_image_url;
+          } catch (error) {
+            console.error(`[Order ${orderData.id}] ❌ Failed to generate cover image signed URL:`, error);
+            // Fallback: use direct URL (will work if bucket policy is set)
+            orderData.book.cover_image_access_url = orderData.book.cover_image_url;
+            delete orderData.book.cover_image_url;
+          }
         }
 
         return {

@@ -37,7 +37,7 @@ router.get('/public', async (req, res) => {
 // Get books based on user role and permissions
 router.get('/', 
   authenticateToken, 
-  bookController.getBooks
+  (req, res) => bookController.getBooks(req, res)
 );
 
 
@@ -74,14 +74,14 @@ router.get('/user-books',
 router.get('/:bookId', 
   authenticateToken, 
   requireBookAccess,
-  bookController.getBook
+  (req, res) => bookController.getBook(req, res)
 );
 
 // Log book access (view/download tracking)
 router.post('/:bookId/access', 
   authenticateToken, 
   requireBookAccess,
-  bookController.logBookAccess
+  (req, res) => bookController.logBookAccess(req, res)
 );
 
 /**
@@ -92,21 +92,21 @@ router.post('/:bookId/access',
 router.post('/', 
   authenticateToken, 
   requireAdmin,
-  bookController.createBook
+  (req, res) => bookController.createBook(req, res)
 );
 
 // Update book information
 router.put('/:bookId', 
   authenticateToken, 
   requireAdmin,
-  bookController.updateBook
+  (req, res) => bookController.updateBook(req, res)
 );
 
 // Delete book
 router.delete('/:bookId', 
   authenticateToken, 
   requireAdmin,
-  bookController.deleteBook
+  (req, res) => bookController.deleteBook(req, res)
 );
 
 /**
@@ -119,7 +119,7 @@ router.post('/:bookId/upload-pdf',
   requireAdmin,
   uploadBookFile, // Multer middleware for 'book' field
   handleFileUploadErrors,
-  bookController.uploadBookPdf
+  (req, res) => bookController.uploadBookPdf(req, res)
 );
 
 // Upload book cover image
@@ -128,7 +128,7 @@ router.post('/:bookId/upload-cover',
   requireAdmin,
   uploadCoverImage, // Multer middleware for 'cover' field
   handleFileUploadErrors,
-  bookController.uploadBookCover
+  (req, res) => bookController.uploadBookCover(req, res)
 );
 
 // Upload both book PDF and cover in one request

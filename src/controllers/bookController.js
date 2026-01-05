@@ -489,6 +489,7 @@ class BookController {
         
         // Check if student has year defined
         if (!userYear) {
+          console.log(`Student ${userId} has no year field defined`);
           return res.json({
             success: true,
             data: {
@@ -505,6 +506,7 @@ class BookController {
         });
         
         if (!studentCollege) {
+          console.log(`College not found for code: ${userCollegeCode}`);
           return res.status(400).json({
             success: false,
             message: 'College not found',
@@ -513,6 +515,7 @@ class BookController {
         }
         
         // Filter by college UUID AND year
+        console.log(`Filtering books for student: college=${studentCollege.code}, year=${userYear}`);
         whereClause.college_id = studentCollege.id;
         whereClause.year = userYear;
         

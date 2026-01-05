@@ -127,10 +127,9 @@ class FileUploadService {
         }
       };
 
-      // Set public read for cover images and advertisements (if needed)
-      if (fileType === 'cover' || fileType === 'advertisement') {
-        uploadParams.ACL = 'public-read';
-      }
+      // Note: ACL is not set here because the bucket uses bucket policies instead
+      // Cover images and advertisements will be publicly accessible via bucket policy
+      // PDFs remain private and require signed URLs
 
       // Upload to S3
       const result = await s3.upload(uploadParams).promise();

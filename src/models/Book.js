@@ -151,11 +151,24 @@ Book.prototype.isAccessibleBy = function (user) {
     if (!user.college_id) return false;
     if (user.college_id !== this.college_id) return false;
 
-    if (
-      user.role === 'college_admin' ||
-      user.role === 'student' ||
-      user.role === 'user'   // ✅ ADD THIS
-    ) {
+    // College admin has access to all books in their college
+    if (user.role === 'college_admin') {
+      return true;
+    }
+
+    // User role has access to all books in any college
+    if (user.role === 'user') {
+      return true;
+    }
+
+    // Student must have matching year
+    if (user.role === 'student') {
+      // Student must have a year field defined
+      if (!user.year) return false;
+      
+      // Book year must match student's year
+      if (user.year !== this.year) return false;
+      
       return true;
     }
   }

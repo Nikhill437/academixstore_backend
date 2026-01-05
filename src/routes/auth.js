@@ -76,7 +76,8 @@ router.post('/register', async (req, res) => {
         userId: user.id, 
         email: user.email, 
         role: user.role,
-        collegeId: user.college_id
+        collegeId: user.college_id,
+        year: user.year
       },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
@@ -149,7 +150,8 @@ router.post('/login', async (req, res) => {
         userId: user.id, 
         email: user.email, 
         role: user.role,
-        collegeId: user.college_id
+        collegeId: user.college_id,
+        year: user.year
       },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
@@ -213,11 +215,11 @@ router.get('/me', authenticateToken, async (req, res) => {
 // Refresh token
 router.post('/refresh', authenticateToken, async (req, res) => {
   try {
-    const { userId, email, role, collegeId } = req.user;
+    const { userId, email, role, collegeId, year } = req.user;
 
     // Generate new token
     const token = jwt.sign(
-      { userId, email, role, collegeId },
+      { userId, email, role, collegeId, year },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );

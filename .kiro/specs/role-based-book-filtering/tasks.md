@@ -29,7 +29,7 @@ This implementation plan breaks down the role-based book filtering feature into 
   - Test college_admin accessing own college books (should return true regardless of year)
   - _Requirements: 1.4, 1.5, 2.3, 3.3, 4.3_
 
-- [ ] 2. Update BookController.getBooks() with role-based year filtering
+- [x] 2. Update BookController.getBooks() with role-based year filtering
   - Modify the `getBooks()` method in `src/controllers/bookController.js`
   - Add year filter to whereClause for student role
   - Ensure user and super_admin roles have no year filtering
@@ -80,7 +80,7 @@ This implementation plan breaks down the role-based book filtering feature into 
   - Test response format matches existing API structure
   - _Requirements: 5.1, 5.2, 5.5_
 
-- [ ] 3. Update BookController.getBook() to use enhanced isAccessibleBy()
+- [x] 3. Update BookController.getBook() to use enhanced isAccessibleBy()
   - Verify the `getBook()` method in `src/controllers/bookController.js` correctly uses `isAccessibleBy()`
   - Ensure year-based access control is enforced for individual book requests
   - Test that students cannot access books from different years
@@ -101,7 +101,7 @@ This implementation plan breaks down the role-based book filtering feature into 
   - Test college_admin accessing other college's book (should return 403)
   - _Requirements: 1.5, 4.3_
 
-- [ ] 4. Checkpoint - Ensure all tests pass
+- [x] 4. Checkpoint - Ensure all tests pass
   - Run all unit tests and property-based tests
   - Verify no regressions in existing functionality
   - Ensure all tests pass, ask the user if questions arise

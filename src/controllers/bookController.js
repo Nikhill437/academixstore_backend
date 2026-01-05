@@ -422,7 +422,8 @@ class BookController {
   try {
     const userRole = req.user.role;
     const userId = req.user.id;
-    const userCollegeId = req.user.collegeId;
+    const userCollegeCode = req.user.collegeId; // This is the college code (STRING)
+    const userYear = req.user.year; // Student's year
 
     const { category, year, semester } = req.query;
 
@@ -438,6 +439,7 @@ class BookController {
     // Apply role-based filtering
     switch (userRole) {
       case 'super_admin':
+        // Super admin sees all books
         includeClause.push({
           model: College,
           as: 'college',
@@ -446,14 +448,29 @@ class BookController {
         break;
 
       case 'college_admin':
-        if (!userCollegeId) {
+        if (!userCollegeCode) {
           return res.status(400).json({
             success: false,
             message: 'College admin must be associated with a college',
             error: 'NO_COLLEGE_ASSOCIATION'
           });
         }
-        whereClause.college_id = userCollegeId;
+        
+        // Find college UUID from college code
+        const adminCollege = await College.findOne({
+          where: { code: userCollegeCode, is_active: true }
+        });
+        
+        if (!adminCollege) {
+          return res.status(400).json({
+            success: false,
+            message: 'College not found',
+            error: 'COLLEGE_NOT_FOUND'
+          });
+        }
+        
+        // Filter by college UUID (all years)
+        whereClause.college_id = adminCollege.id;
         includeClause.push({
           model: College,
           as: 'college',
@@ -462,17 +479,52 @@ class BookController {
         break;
 
       case 'student':
-        if (!userCollegeId) {
+        if (!userCollegeCode) {
           return res.status(400).json({
             success: false,
             message: 'Student must be associated with a college',
             error: 'NO_COLLEGE_ASSOCIATION'
           });
         }
-        whereClause.college_id = userCollegeId;
+        
+        // Check if student has year defined
+        if (!userYear) {
+          return res.json({
+            success: true,
+            data: {
+              books: [],
+              count: 0,
+              message: 'No year information available for student account'
+            }
+          });
+        }
+        
+        // Find college UUID from college code
+        const studentCollege = await College.findOne({
+          where: { code: userCollegeCode, is_active: true }
+        });
+        
+        if (!studentCollege) {
+          return res.status(400).json({
+            success: false,
+            message: 'College not found',
+            error: 'COLLEGE_NOT_FOUND'
+          });
+        }
+        
+        // Filter by college UUID AND year
+        whereClause.college_id = studentCollege.id;
+        whereClause.year = userYear;
+        
+        includeClause.push({
+          model: College,
+          as: 'college',
+          attributes: ['id', 'name', 'code']
+        });
         break;
 
       case 'user':
+        // User role sees all books
         includeClause.push({
           model: College,
           as: 'college',

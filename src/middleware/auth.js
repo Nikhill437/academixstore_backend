@@ -52,7 +52,7 @@ export const authenticateToken = async (req, res, next) => {
       email: decoded.email,
       role: decoded.role,
       collegeId: decoded.collegeId || null, // Handle undefined collegeId
-      collegeYear: decoded.collegeYear || null
+      year: decoded.year || null // Add year field for student filtering
     };
 
     next();
@@ -89,7 +89,7 @@ export const optionalAuth = async (req, res, next) => {
       email: decoded.email,
       role: decoded.role,
       collegeId: decoded.collegeId || null, // Handle undefined collegeId
-      collegeYear: decoded.collegeYear || null
+      year: decoded.year || null // Add year field for student filtering
     };
   } catch (error) {
     // If token is invalid, continue without authentication

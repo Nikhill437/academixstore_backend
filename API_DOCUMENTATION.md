@@ -268,6 +268,7 @@ GET /api/books?category=Computer Science&year=2024&semester=3
         "pdf_url": "https://your-bucket.s3.region.amazonaws.com/books/pdfs/uuid/file.pdf",
         "pdf_access_url": "https://signed-url-for-students.s3.amazonaws.com/...",
         "cover_image_url": "https://your-bucket.s3.region.amazonaws.com/books/covers/uuid/cover.jpg",
+        "purchased": 1,
         "college": {
           "id": "uuid",
           "name": "Delhi Technical University",
@@ -287,6 +288,9 @@ GET /api/books?category=Computer Science&year=2024&semester=3
 - **pdf_url**: Permanent S3 URL (for admins)
 - **pdf_access_url**: Signed URL with 1-hour expiry (for students/users)
 - **cover_image_url**: Public image URL
+- **purchased**: Indicates if the authenticated user has purchased this book (1 = purchased, 0 = not purchased)
+  - Only users with role 'user' can have purchased = 1
+  - Students, admins always see purchased = 0
 - Students and users only get `pdf_access_url` for security
 - Admins get both URLs but typically use `pdf_url`
 
@@ -320,6 +324,7 @@ GET /api/books/:bookId
       "pdf_url": "https://your-bucket.s3.region.amazonaws.com/books/pdfs/uuid/file.pdf",
       "pdf_access_url": "https://signed-url-for-students.s3.amazonaws.com/...",
       "cover_image_url": "https://your-bucket.s3.region.amazonaws.com/books/covers/uuid/cover.jpg",
+      "purchased": 1,
       "college": {
         "name": "Delhi Technical University"
       },
@@ -780,6 +785,126 @@ DELETE /api/individual-users/:id
 
 ---
 
+## 💳 Order & Purchase Routes
+
+### 1. Create Order (Book Purchase)
+```http
+POST /api/orders/create
+```
+*Requires Authentication*
+
+**Request Body:**
+```json
+{
+  "book_id": "uuid-of-book"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "razorpay_order_id": "order_xyz123",
+    "amount": 49900,
+    "currency": "INR",
+    "razorpay_key": "rzp_test_xxxxx",
+    "book": {
+      "id": "uuid",
+      "title": "Data Structures and Algorithms"
+    }
+  }
+}
+```
+
+### 2. Verify Payment
+```http
+POST /api/orders/verify-payment
+```
+*Requires Authentication*
+
+**Request Body:**
+```json
+{
+  "razorpay_order_id": "order_xyz123",
+  "razorpay_payment_id": "pay_abc456",
+  "razorpay_signature": "signature_hash"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Payment successful",
+  "data": {
+    "orderId": "uuid"
+  }
+}
+```
+
+### 3. Get My Purchased Books
+```http
+GET /api/orders/my-purchases?page=1&limit=10&status=paid
+```
+*Requires: user role only (not available for students)*
+
+**Query Parameters:**
+- `page` (optional): Page number (default: 1)
+- `limit` (optional): Items per page (default: 10)
+- `status` (optional): Filter by order status (default: 'paid')
+  - Options: 'created', 'pending', 'paid', 'failed', 'refunded'
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "purchases": [
+      {
+        "id": "order-uuid",
+        "book": {
+          "id": "book-uuid",
+          "name": "Data Structures and Algorithms",
+          "authorname": "Thomas H. Cormen",
+          "description": "Comprehensive guide to DSA",
+          "category": "Computer Science",
+          "subject": "Programming",
+          "language": "English",
+          "year": 2024,
+          "semester": 3,
+          "pages": 1312,
+          "rating": 4.5,
+          "pdf_access_url": "https://signed-url-with-1hr-expiry.s3.amazonaws.com/...",
+          "cover_image_url": "https://your-bucket.s3.region.amazonaws.com/books/covers/uuid/cover.jpg"
+        },
+        "amount": 499.00,
+        "currency": "INR",
+        "status": "paid",
+        "payment_method": "card",
+        "purchased_at": "2024-12-31T10:30:00Z",
+        "razorpay_order_id": "order_xyz123",
+        "razorpay_payment_id": "pay_abc456"
+      }
+    ],
+    "pagination": {
+      "total": 5,
+      "page": 1,
+      "limit": 10,
+      "totalPages": 1
+    }
+  }
+}
+```
+
+**Important Notes:**
+- Only users with role 'user' can access this endpoint
+- Students cannot purchase books (they have free access to their college books)
+- PDF access URLs are signed and valid for 1 hour
+- Returns books ordered by purchase date (most recent first)
+
+---
+
 ## ⚙️ System Settings Routes
 
 ### 1. Get All System Settings
@@ -919,7 +1044,9 @@ GET /health
 
 ### Individual User (`user`)
 - ✅ View all books from all colleges
-- ✅ Download/access books from any college
+- ✅ Purchase books via Razorpay payment gateway
+- ✅ View purchased books with PDF access
+- ✅ Download/access purchased books
 - ✅ Update their own profile
 - ❌ Cannot manage books or other users
 - ❌ Cannot access admin functions

@@ -31,6 +31,9 @@ const fileFilter = (req, file, cb) => {
     case 'pdf':
       allowedTypes = S3_CONFIG.allowedTypes.bookPdf;
       break;
+    case 'question_paper':
+      allowedTypes = S3_CONFIG.allowedTypes.questionPaperPdf;
+      break;
     case 'cover':
     case 'image':
     case 'advertisement':
@@ -231,6 +234,7 @@ export const uploadMixedFiles = (fields) => {
 export const uploadBookFile = uploadSingleFile('book');
 export const uploadCoverImage = uploadSingleFile('cover');
 export const uploadAdvertisementImage = uploadSingleFile('image');
+export const uploadQuestionPaperFile = uploadSingleFile('question_paper');
 
 /**
  * Middleware for book with cover (both files)

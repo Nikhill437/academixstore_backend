@@ -1,8 +1,9 @@
 import jwt from 'jsonwebtoken';
 import { jwtConfig } from '../config/jwt.js';
+import sessionService from '../services/sessionService.js';
 
 /**
- * Authentication middleware to verify JWT tokens
+ * Authentication middleware to verify JWT tokens and validate sessions
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  * @param {Function} next - Express next function
@@ -41,10 +42,28 @@ export const authenticateToken = async (req, res, next) => {
       throw jwtError;
     }
 
-    // For now, we'll skip session validation until models are set up
-    // This will be enhanced once we have the UserSession model
+    // Validate session in database
+    try {
+      const session = await sessionService.validateSession(token);
+      
+      if (!session) {
+        // Session not found, revoked, or expired
+        return res.status(401).json({
+          success: false,
+          message: 'Session invalid or expired',
+          error: 'SESSION_REVOKED'
+        });
+      }
+    } catch (sessionError) {
+      console.error('Session validation error:', sessionError);
+      return res.status(500).json({
+        success: false,
+        message: 'Session validation failed',
+        error: 'SESSION_VALIDATION_FAILED'
+      });
+    }
     
-    // Attach user info to request (simplified for now)
+    // Attach user info to request
     req.user = {
       id: decoded.userId,
       userId: decoded.userId, // Add userId for compatibility
@@ -54,6 +73,9 @@ export const authenticateToken = async (req, res, next) => {
       collegeId: decoded.collegeId || null, // Handle undefined collegeId
       year: decoded.year || null // Add year field for student filtering
     };
+
+    // Store token in request for logout functionality
+    req.token = token;
 
     next();
   } catch (error) {

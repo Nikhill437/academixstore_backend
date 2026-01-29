@@ -1000,6 +1000,481 @@ GET /api/system-settings/:key/history
 
 ---
 
+## 📄 Question Paper Management Routes
+
+### Overview
+The Question Paper Management system allows admins to upload and manage exam question papers (PDFs) with role-based access control. Question papers are organized by subject, year, semester, and college.
+
+### 1. Create Question Paper
+```http
+POST /api/question-papers
+```
+*Requires: super_admin or college_admin*
+
+**Request Body:**
+```json
+{
+  "title": "Midterm Exam - Data Structures",
+  "description": "Midterm examination covering arrays, linked lists, stacks, and queues",
+  "subject": "Data Structures",
+  "year": 2,
+  "semester": 3,
+  "exam_type": "midterm",
+  "marks": 100,
+  "college_id": "uuid-here"
+}
+```
+
+**Field Details:**
+- `title` (required): String, max 500 characters
+- `description` (optional): Text
+- `subject` (required): String, max 100 characters
+- `year` (required): Integer, 1-4 (undergraduate years)
+- `semester` (required): Integer, 1-8
+- `exam_type` (optional): Enum - 'midterm', 'final', 'quiz', 'practice'
+- `marks` (optional): Integer, total marks for the exam
+- `college_id` (optional): UUID
+  - **Super admin**: Can specify any college_id or leave null for global papers
+  - **College admin**: Automatically set to their college (ignored if provided)
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Question paper created successfully",
+  "data": {
+    "question_paper": {
+      "id": "uuid",
+      "title": "Midterm Exam - Data Structures",
+      "description": "Midterm examination covering arrays, linked lists, stacks, and queues",
+      "subject": "Data Structures",
+      "year": 2,
+      "semester": 3,
+      "exam_type": "midterm",
+      "marks": 100,
+      "college_id": "uuid",
+      "is_active": true,
+      "created_by": "uuid",
+      "created_at": "2026-01-29T10:00:00Z",
+      "updated_at": "2026-01-29T10:00:00Z"
+    }
+  }
+}
+```
+
+### 2. Get Question Papers (List with Filters)
+```http
+GET /api/question-papers?subject=Data Structures&year=2&semester=3&exam_type=midterm
+```
+*Requires Authentication (all roles)*
+
+**Query Parameters:**
+- `subject` (optional): Filter by subject name
+- `year` (optional): Filter by academic year (1-4)
+- `semester` (optional): Filter by semester (1-8)
+- `exam_type` (optional): Filter by exam type (midterm, final, quiz, practice)
+
+**Role-Based Filtering:**
+- **super_admin**: Sees all question papers from all colleges
+- **college_admin**: Sees only question papers from their college (all years)
+- **student**: Sees only question papers from their college AND matching their year
+- **user**: Sees all question papers from all colleges
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "question_papers": [
+      {
+        "id": "uuid",
+        "title": "Midterm Exam - Data Structures",
+        "description": "Midterm examination covering arrays, linked lists, stacks, and queues",
+        "subject": "Data Structures",
+        "year": 2,
+        "semester": 3,
+        "exam_type": "midterm",
+        "marks": 100,
+        "pdf_access_url": "https://signed-url-with-1hr-expiry.s3.amazonaws.com/...",
+        "college": {
+          "id": "uuid",
+          "name": "Delhi Technical University",
+          "code": "DTU001"
+        },
+        "creator": {
+          "id": "uuid",
+          "full_name": "Admin User",
+          "email": "admin@dtu.ac.in"
+        },
+        "created_at": "2026-01-29T10:00:00Z",
+        "updated_at": "2026-01-29T10:00:00Z"
+      }
+    ],
+    "count": 1
+  }
+}
+```
+
+**Important Notes:**
+- `pdf_access_url`: Signed URL valid for 1 hour (for secure access)
+- Direct S3 URLs are never exposed to clients
+- Results are ordered by creation date (most recent first)
+
+### 3. Get Single Question Paper
+```http
+GET /api/question-papers/:questionPaperId
+```
+*Requires Authentication (must have access)*
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "question_paper": {
+      "id": "uuid",
+      "title": "Midterm Exam - Data Structures",
+      "description": "Midterm examination covering arrays, linked lists, stacks, and queues",
+      "subject": "Data Structures",
+      "year": 2,
+      "semester": 3,
+      "exam_type": "midterm",
+      "marks": 100,
+      "pdf_access_url": "https://signed-url-with-1hr-expiry.s3.amazonaws.com/...",
+      "college": {
+        "id": "uuid",
+        "name": "Delhi Technical University",
+        "code": "DTU001"
+      },
+      "creator": {
+        "id": "uuid",
+        "full_name": "Admin User",
+        "email": "admin@dtu.ac.in"
+      },
+      "created_at": "2026-01-29T10:00:00Z",
+      "updated_at": "2026-01-29T10:00:00Z"
+    }
+  }
+}
+```
+
+### 4. Update Question Paper
+```http
+PUT /api/question-papers/:questionPaperId
+```
+*Requires: super_admin or college_admin (own college only)*
+
+**Request Body:** (All fields optional)
+```json
+{
+  "title": "Updated Title",
+  "description": "Updated description",
+  "subject": "Updated Subject",
+  "year": 3,
+  "semester": 5,
+  "exam_type": "final",
+  "marks": 120
+}
+```
+
+**Allowed Updates:**
+- title, description, subject, year, semester, exam_type, marks
+- Cannot update: id, pdf_url, college_id, created_by, timestamps
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Question paper updated successfully",
+  "data": {
+    "question_paper": { /* updated question paper object */ }
+  }
+}
+```
+
+### 5. Delete Question Paper
+```http
+DELETE /api/question-papers/:questionPaperId
+```
+*Requires: super_admin or college_admin (own college only)*
+
+**Behavior:**
+- Performs **soft delete** (sets `is_active` to false)
+- Attempts to delete PDF file from S3 (logs warning if fails)
+- Question paper remains in database but won't appear in queries
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Question paper deleted successfully"
+}
+```
+
+### 6. Upload Question Paper PDF
+```http
+POST /api/question-papers/:questionPaperId/upload-pdf
+```
+*Requires: super_admin or college_admin (own college only)*
+*Content-Type: multipart/form-data*
+
+**Form Data:**
+- `question_paper`: PDF file (Max: 50MB)
+
+**File Requirements:**
+- **Type**: PDF files only (`application/pdf`)
+- **Size**: Maximum 50MB
+- **Storage**: Files uploaded to AWS S3 at `question-papers/pdfs/{id}/`
+- **Naming**: Unique filename with timestamp and UUID
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Question paper PDF uploaded successfully",
+  "data": {
+    "question_paper_id": "uuid",
+    "pdf_url": "https://your-bucket.s3.region.amazonaws.com/question-papers/pdfs/uuid/file.pdf",
+    "signed_url": "https://signed-url-with-1hr-expiry.s3.amazonaws.com/...",
+    "original_name": "midterm-exam.pdf"
+  }
+}
+```
+
+**Upload Process:**
+1. Validates file type and size
+2. Checks user permissions
+3. Deletes old PDF from S3 (if exists)
+4. Uploads new PDF to S3
+5. Updates question paper record with S3 URL
+6. Returns signed URL for immediate access
+
+### 7. Refresh PDF Access URL
+```http
+GET /api/question-papers/:questionPaperId/refresh-url
+```
+*Requires Authentication (must have access)*
+
+**Purpose:** Generate a new signed URL when the previous one expires (after 1 hour)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "question_paper_id": "uuid",
+    "pdf_access_url": "https://new-signed-url-with-1hr-expiry.s3.amazonaws.com/...",
+    "expires_in": 3600
+  }
+}
+```
+
+### 8. Log Question Paper Access
+```http
+POST /api/question-papers/:questionPaperId/access
+```
+*Requires Authentication (must have access)*
+
+**Request Body:**
+```json
+{
+  "access_type": "view"
+}
+```
+
+**Access Types:**
+- `view`: User viewed the question paper
+- `download`: User downloaded the PDF
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Question paper access logged successfully"
+}
+```
+
+**Logged Information:**
+- user_id
+- question_paper_id
+- access_type
+- timestamp
+- IP address
+- User agent
+
+### 9. Get Question Papers by Subject
+```http
+GET /api/question-papers/subject/:subject
+```
+*Requires Authentication*
+
+**Example:**
+```http
+GET /api/question-papers/subject/Data%20Structures
+```
+
+**Response:** Same as "Get Question Papers" but filtered by subject
+
+### 10. Get Question Papers by Year
+```http
+GET /api/question-papers/year/:year
+```
+*Requires: super_admin or college_admin*
+
+**Example:**
+```http
+GET /api/question-papers/year/2
+```
+
+### 11. Get Question Papers by Semester
+```http
+GET /api/question-papers/semester/:semester
+```
+*Requires: super_admin or college_admin*
+
+**Example:**
+```http
+GET /api/question-papers/semester/3
+```
+
+### 12. Get Question Papers by Exam Type
+```http
+GET /api/question-papers/exam-type/:examType
+```
+*Requires Authentication*
+
+**Example:**
+```http
+GET /api/question-papers/exam-type/midterm
+```
+
+**Valid Exam Types:**
+- `midterm`
+- `final`
+- `quiz`
+- `practice`
+
+---
+
+## 📤 Question Paper Upload Flow
+
+### Complete Upload Process
+
+The question paper upload follows a **2-step process**:
+
+#### **Step 1: Create Question Paper Record**
+```http
+POST /api/question-papers
+```
+Create the question paper metadata first (without PDF). This returns a `question_paper_id`.
+
+#### **Step 2: Upload PDF File**
+```http
+POST /api/question-papers/{question_paper_id}/upload-pdf
+```
+Upload the actual PDF file to AWS S3 and link it to the question paper.
+
+### 🔄 Flow Diagram
+```
+1. Create Question Paper → 2. Upload PDF → 3. Store S3 URL in DB → 4. Get API returns signed URLs
+```
+
+### 📁 S3 File Organization
+```
+your-s3-bucket/
+├── question-papers/
+│   └── pdfs/
+│       ├── {question-paper-id-1}/
+│       │   └── 1706534800000-a1b2c3d4.pdf
+│       ├── {question-paper-id-2}/
+│       │   └── 1706534801000-e5f6g7h8.pdf
+```
+
+### 🔐 URL Access Control
+
+| User Role | Access Scope | URL Type |
+|-----------|-------------|----------|
+| **super_admin** | All question papers | Signed URL (1hr) |
+| **college_admin** | Own college papers (all years) | Signed URL (1hr) |
+| **student** | Own college + own year papers | Signed URL (1hr) |
+| **user** | All question papers | Signed URL (1hr) |
+
+### 🛡️ Security Features
+
+- ✅ **File Validation**: Only PDF files, max 50MB
+- ✅ **Access Control**: Role-based upload and view permissions
+- ✅ **Signed URLs**: Time-limited access (1 hour expiry)
+- ✅ **Organized Storage**: Files organized by question paper ID
+- ✅ **Cleanup**: Old files deleted when new ones uploaded
+- ✅ **Soft Delete**: Question papers can be recovered if needed
+
+### 📱 Complete Example
+
+#### 1. Create Question Paper
+```bash
+curl -X POST http://localhost:3000/api/question-papers \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Final Exam - Data Structures",
+    "subject": "Data Structures",
+    "year": 2,
+    "semester": 3,
+    "exam_type": "final",
+    "marks": 100
+  }'
+```
+
+#### 2. Upload PDF
+```bash
+curl -X POST http://localhost:3000/api/question-papers/question-paper-uuid/upload-pdf \
+  -H "Authorization: Bearer your-jwt-token" \
+  -F "question_paper=@/path/to/exam-paper.pdf"
+```
+
+#### 3. Get Question Papers (with signed URLs)
+```bash
+curl -X GET "http://localhost:3000/api/question-papers?subject=Data%20Structures&year=2&semester=3" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+#### 4. Refresh Expired URL
+```bash
+curl -X GET http://localhost:3000/api/question-papers/question-paper-uuid/refresh-url \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### ⚙️ Configuration Required
+
+**Environment Variables:**
+```env
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_REGION=us-east-1
+AWS_S3_BUCKET=your-bucket-name
+```
+
+**AWS S3 Permissions Required:**
+- `s3:PutObject` - Upload files
+- `s3:GetObject` - Generate signed URLs
+- `s3:DeleteObject` - Delete old files
+- `s3:ListBucket` - List bucket contents
+
+---
+
+## 🔒 Question Paper Access Matrix
+
+| Role | Create | View All | View Own College | View Own Year | Update | Delete | Upload PDF |
+|------|--------|----------|------------------|---------------|--------|--------|------------|
+| **super_admin** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **college_admin** | ✅ | ❌ | ✅ (all years) | ✅ | ✅* | ✅* | ✅* |
+| **student** | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| **user** | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+
+*College admins can only update/delete/upload for their own college's question papers
+
+---
+
 ## 📊 Health & Utility Routes
 
 ### 1. Health Check
@@ -1090,6 +1565,7 @@ GET /health
 
 ## 🚨 Common Error Codes
 
+### General Errors
 - `AUTH_REQUIRED`: Authentication token required
 - `ACCESS_DENIED`: Insufficient permissions
 - `VALIDATION_ERROR`: Request validation failed
@@ -1097,6 +1573,19 @@ GET /health
 - `ALREADY_EXISTS`: Resource already exists
 - `SERVER_ERROR`: Internal server error
 - `RATE_LIMIT_EXCEEDED`: Too many requests
+
+### Question Paper Specific Errors
+- `QUESTION_PAPER_NOT_FOUND`: Question paper does not exist
+- `INSUFFICIENT_PERMISSIONS`: Role not authorized for this operation
+- `NO_FILE`: No PDF file provided in upload request
+- `INVALID_FILE_TYPE`: File is not a PDF
+- `FILE_TOO_LARGE`: File exceeds 50MB limit
+- `NO_PDF`: Question paper has no PDF attached
+- `UPLOAD_ERROR`: S3 upload failed
+- `NO_COLLEGE_ASSOCIATION`: User must be associated with a college
+- `COLLEGE_NOT_FOUND`: College does not exist
+- `INVALID_COLLEGE`: Invalid or inactive college specified
+- `URL_GENERATION_FAILED`: Failed to generate signed URL
 
 ---
 
@@ -1121,5 +1610,15 @@ GET /health
 - `name`: 2-255 characters, required
 - `code`: 2-20 characters, uppercase, unique
 - `email`: Valid email format, unique
+
+### Question Paper Fields
+- `title`: 1-500 characters, required
+- `subject`: 1-100 characters, required
+- `year`: 1-4 (undergraduate years), required
+- `semester`: 1-8, required
+- `exam_type`: Must be one of: midterm, final, quiz, practice (optional)
+- `marks`: Minimum 0 (optional)
+- `description`: Text, optional
+- `college_id`: Valid UUID (optional for super_admin, auto-set for college_admin)
 
 This documentation covers all the API endpoints with their required authentication, request bodies, and expected responses. The system is designed to handle educational book management with proper role-based access control.

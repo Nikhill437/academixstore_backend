@@ -59,6 +59,7 @@ export const S3_CONFIG = {
   paths: {
     books: 'books/pdfs/',
     covers: 'books/covers/',
+    questionPapers: 'question-papers/pdfs/',
     advertisements: 'ads/images/',
     temp: 'temp/'
   },
@@ -66,6 +67,7 @@ export const S3_CONFIG = {
   // File size limits (in bytes)
   limits: {
     bookPdf: 100 * 1024 * 1024, // 100MB
+    questionPaperPdf: 50 * 1024 * 1024, // 50MB
     coverImage: 5 * 1024 * 1024, // 5MB
     adImage: 2 * 1024 * 1024      // 2MB
   },
@@ -73,6 +75,7 @@ export const S3_CONFIG = {
   // Allowed file types
   allowedTypes: {
     bookPdf: ['application/pdf'],
+    questionPaperPdf: ['application/pdf'],
     images: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
   },
   

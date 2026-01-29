@@ -267,6 +267,59 @@ export const requireBookAccess = (req, res, next) => {
   });
 };
 
+/**
+ * Question Paper access middleware
+ * Ensures proper access control for question papers based on user type
+ */
+export const requireQuestionPaperAccess = async (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required',
+      error: 'NO_AUTH'
+    });
+  }
+
+  try {
+    const { questionPaperId } = req.params;
+    
+    // Import QuestionPaper model dynamically to avoid circular dependencies
+    const { QuestionPaper } = await import('../models/index.js');
+    
+    // Find question paper
+    const questionPaper = await QuestionPaper.findByPk(questionPaperId);
+    
+    if (!questionPaper) {
+      return res.status(404).json({
+        success: false,
+        message: 'Question paper not found',
+        error: 'QUESTION_PAPER_NOT_FOUND'
+      });
+    }
+
+    // Check access using model method
+    if (!questionPaper.isAccessibleBy(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied to this question paper',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Attach question paper to request for downstream use
+    req.questionPaper = questionPaper;
+    next();
+    
+  } catch (error) {
+    console.error('Question paper access check error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error checking question paper access',
+      error: 'SERVER_ERROR'
+    });
+  }
+};
+
 
 /**
  * Generic role checker middleware factory

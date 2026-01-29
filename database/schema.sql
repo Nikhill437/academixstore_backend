@@ -6,6 +6,7 @@ CREATE TYPE user_role_enum AS ENUM ('super_admin', 'admin', 'student', 'user');
 CREATE TYPE subscription_status_enum AS ENUM ('active', 'inactive', 'expired', 'cancelled');
 CREATE TYPE book_category_enum AS ENUM ('textbook', 'reference', 'fiction', 'non_fiction', 'academic', 'technical');
 CREATE TYPE college_year_enum AS ENUM ('first_year', 'second_year', 'third_year', 'fourth_year', 'graduate');
+CREATE TYPE exam_type_enum AS ENUM ('midterm', 'final', 'quiz', 'practice');
 
 -- Users table (unified table for all user types)
 CREATE TABLE users (
@@ -184,6 +185,42 @@ CREATE TABLE user_sessions (
     is_revoked BOOLEAN DEFAULT false
 );
 
+-- Question Papers table
+CREATE TABLE question_papers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(500) NOT NULL,
+    description TEXT,
+    subject VARCHAR(100) NOT NULL,
+    year INTEGER NOT NULL,
+    semester INTEGER NOT NULL,
+    exam_type exam_type_enum,
+    marks INTEGER,
+    pdf_url TEXT,
+    college_id UUID REFERENCES colleges(id),
+    is_active BOOLEAN DEFAULT true,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Constraints
+    CONSTRAINT question_papers_title_not_empty CHECK (title <> ''),
+    CONSTRAINT question_papers_subject_not_empty CHECK (subject <> ''),
+    CONSTRAINT question_papers_year_range CHECK (year >= 1 AND year <= 4),
+    CONSTRAINT question_papers_semester_range CHECK (semester >= 1 AND semester <= 8),
+    CONSTRAINT question_papers_marks_positive CHECK (marks IS NULL OR marks >= 0)
+);
+
+-- Question Paper Access Logs table
+CREATE TABLE question_paper_access_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    question_paper_id UUID REFERENCES question_papers(id) ON DELETE CASCADE NOT NULL,
+    access_type VARCHAR(20) DEFAULT 'view',
+    accessed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    ip_address INET,
+    user_agent TEXT
+);
+
 -- Indexes for better performance
 CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_users_college_id ON users(college_id);
@@ -205,7 +242,22 @@ CREATE INDEX idx_book_access_logs_user_id ON book_access_logs(user_id);
 CREATE INDEX idx_book_access_logs_book_id ON book_access_logs(book_id);
 
 CREATE INDEX idx_user_sessions_user_id ON user_sessions(user_id);
+CREATE INDEX idx_user_sessions_token_hash ON user_sessions(token_hash);
 CREATE INDEX idx_user_sessions_expires_at ON user_sessions(expires_at);
+
+CREATE INDEX idx_question_papers_college_id ON question_papers(college_id);
+CREATE INDEX idx_question_papers_year ON question_papers(year);
+CREATE INDEX idx_question_papers_semester ON question_papers(semester);
+CREATE INDEX idx_question_papers_subject ON question_papers(subject);
+CREATE INDEX idx_question_papers_created_by ON question_papers(created_by);
+CREATE INDEX idx_question_papers_is_active ON question_papers(is_active);
+CREATE INDEX idx_question_papers_exam_type ON question_papers(exam_type);
+CREATE INDEX idx_question_papers_college_year ON question_papers(college_id, year);
+CREATE INDEX idx_question_papers_college_year_semester ON question_papers(college_id, year, semester);
+
+CREATE INDEX idx_qp_access_logs_user_id ON question_paper_access_logs(user_id);
+CREATE INDEX idx_qp_access_logs_question_paper_id ON question_paper_access_logs(question_paper_id);
+CREATE INDEX idx_qp_access_logs_accessed_at ON question_paper_access_logs(accessed_at);
 
 -- Triggers for updated_at timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -223,6 +275,7 @@ CREATE TRIGGER update_books_updated_at BEFORE UPDATE ON books FOR EACH ROW EXECU
 CREATE TRIGGER update_subscription_plans_updated_at BEFORE UPDATE ON subscription_plans FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_user_subscriptions_updated_at BEFORE UPDATE ON user_subscriptions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_advertisements_updated_at BEFORE UPDATE ON advertisements FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_question_papers_updated_at BEFORE UPDATE ON question_papers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Sample Super Admin user (password should be hashed in real implementation)
 INSERT INTO users (id, username, email, password_hash, role, first_name, last_name) 

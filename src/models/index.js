@@ -12,6 +12,8 @@ import BookAccessLog from './BookAccessLog.js';
 import UserSession from './UserSession.js';
 import SystemSettings from './SystemSettings.js';
 import Order from './Order.js';
+import QuestionPaper from './QuestionPaper.js';
+import QuestionPaperAccessLog from './QuestionPaperAccessLog.js';
 // Define associations
 const setupAssociations = () => {
   // User - College associations
@@ -144,6 +146,45 @@ const setupAssociations = () => {
     foreignKey: 'updated_by',
     as: 'updated_settings'
   });
+
+  // QuestionPaper - College associations
+  QuestionPaper.belongsTo(College, {
+    foreignKey: 'college_id',
+    as: 'college'
+  });
+  College.hasMany(QuestionPaper, {
+    foreignKey: 'college_id',
+    as: 'question_papers'
+  });
+
+  // QuestionPaper - User (creator) associations
+  QuestionPaper.belongsTo(User, {
+    foreignKey: 'created_by',
+    as: 'creator'
+  });
+  User.hasMany(QuestionPaper, {
+    foreignKey: 'created_by',
+    as: 'created_question_papers'
+  });
+
+  // QuestionPaperAccessLog associations
+  QuestionPaperAccessLog.belongsTo(User, {
+    foreignKey: 'user_id',
+    as: 'user'
+  });
+  QuestionPaperAccessLog.belongsTo(QuestionPaper, {
+    foreignKey: 'question_paper_id',
+    as: 'question_paper'
+  });
+  
+  User.hasMany(QuestionPaperAccessLog, {
+    foreignKey: 'user_id',
+    as: 'question_paper_access_logs'
+  });
+  QuestionPaper.hasMany(QuestionPaperAccessLog, {
+    foreignKey: 'question_paper_id',
+    as: 'access_logs'
+  });
 };
 
 // Initialize associations
@@ -184,6 +225,8 @@ export {
   UserSession,
   SystemSettings,
   Order,
+  QuestionPaper,
+  QuestionPaperAccessLog,
   testConnection,
   syncModels
 };
@@ -201,6 +244,8 @@ export default {
   UserSession,
   SystemSettings,
   Order,
+  QuestionPaper,
+  QuestionPaperAccessLog,
   testConnection,
   syncModels
 };

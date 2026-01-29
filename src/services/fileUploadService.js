@@ -33,6 +33,10 @@ class FileUploadService {
         allowedTypes = S3_CONFIG.allowedTypes.bookPdf;
         maxSize = S3_CONFIG.limits.bookPdf;
         break;
+      case 'question_paper':
+        allowedTypes = S3_CONFIG.allowedTypes.questionPaperPdf;
+        maxSize = S3_CONFIG.limits.questionPaperPdf;
+        break;
       case 'cover':
       case 'advertisement':
         allowedTypes = S3_CONFIG.allowedTypes.images;
@@ -69,6 +73,9 @@ class FileUploadService {
     switch (fileType) {
       case 'book':
         basePath = S3_CONFIG.paths.books;
+        break;
+      case 'question_paper':
+        basePath = S3_CONFIG.paths.questionPapers;
         break;
       case 'cover':
         basePath = S3_CONFIG.paths.covers;
@@ -129,7 +136,7 @@ class FileUploadService {
 
       // Note: ACL is not set here because the bucket uses bucket policies instead
       // Cover images and advertisements will be publicly accessible via bucket policy
-      // PDFs remain private and require signed URLs
+      // PDFs (books and question papers) remain private and require signed URLs
 
       // Upload to S3
       const result = await s3.upload(uploadParams).promise();
@@ -143,7 +150,7 @@ class FileUploadService {
         originalName: file.originalname,
         // Generate URLs
         publicUrl: generatePublicUrl(result.Key),
-        signedUrl: fileType === 'book' ? generateSignedUrl(result.Key, 3600) : null
+        signedUrl: (fileType === 'book' || fileType === 'question_paper') ? generateSignedUrl(result.Key, 3600) : null
       };
 
     } catch (error) {
@@ -174,6 +181,14 @@ class FileUploadService {
   async uploadAdvertisementImage(file, adId = null) {
     const additionalPath = adId ? `${adId}/` : '';
     return this.uploadFile(file, 'advertisement', additionalPath);
+  }
+
+  /**
+   * Upload question paper PDF
+   */
+  async uploadQuestionPaperPdf(file, questionPaperId = null) {
+    const additionalPath = questionPaperId ? `${questionPaperId}/` : '';
+    return this.uploadFile(file, 'question_paper', additionalPath);
   }
 
   /**

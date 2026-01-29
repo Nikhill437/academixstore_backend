@@ -21,6 +21,7 @@ import advertisementRoutes from './routes/advertisements.js';
 import systemSettingsRoutes from './routes/systemSettings.js';
 import individualUsersRoutes from './routes/individualUsers.js';
 import orderRoutes from './routes/order.js';
+import questionPaperRoutes from './routes/questionPapers.js';
 // Import middleware
 import { authenticateToken } from './middleware/auth.js';
 import errorHandler from './middleware/errorHandler.js';
@@ -114,6 +115,7 @@ app.use('/api/users', authenticateToken, userRoutes);
 app.use('/api/students', authenticateToken, studentRoutes);
 app.use('/api/admins', authenticateToken, adminRoutes);
 app.use('/api/books', bookRoutes); // Some endpoints are public
+app.use('/api/question-papers', questionPaperRoutes); // Question paper management
 app.use('/api/colleges', authenticateToken, collegeRoutes);
 app.use('/api/subscriptions', authenticateToken, subscriptionRoutes);
 app.use('/api/advertisements', advertisementRoutes); // Some endpoints are public

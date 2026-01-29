@@ -2,6 +2,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/index.js';
 import { authenticateToken } from '../middleware/auth.js';
+import sessionService from '../services/sessionService.js';
 
 const router = express.Router();
 
@@ -144,6 +145,15 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // Revoke all existing sessions for this user before creating new one
+    try {
+      const revokedCount = await sessionService.revokeAllUserSessions(user.id);
+      console.log(`Revoked ${revokedCount} existing sessions for user ${user.id}`);
+    } catch (sessionError) {
+      console.error('Error revoking existing sessions:', sessionError);
+      // Continue with login even if revocation fails
+    }
+
     // Generate JWT token
     const token = jwt.sign(
       { 
@@ -156,6 +166,23 @@ router.post('/login', async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
+
+    // Extract expiration time from JWT
+    const decoded = jwt.decode(token);
+    const expiresAt = new Date(decoded.exp * 1000); // Convert Unix timestamp to Date
+
+    // Create new session record
+    try {
+      await sessionService.createSession(user.id, token, expiresAt);
+      console.log(`Created new session for user ${user.id}`);
+    } catch (sessionError) {
+      console.error('Error creating session:', sessionError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to create session',
+        error: 'SESSION_CREATION_FAILED'
+      });
+    }
 
     // Update last login
     await user.update({ last_login: new Date() });
@@ -216,18 +243,64 @@ router.get('/me', authenticateToken, async (req, res) => {
 router.post('/refresh', authenticateToken, async (req, res) => {
   try {
     const { userId, email, role, collegeId, year } = req.user;
+    const oldToken = req.token;
+
+    if (!oldToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'No token found in request',
+        error: 'NO_TOKEN'
+      });
+    }
+
+    // Validate current session is active
+    try {
+      const session = await sessionService.validateSession(oldToken);
+      
+      if (!session) {
+        return res.status(401).json({
+          success: false,
+          message: 'Session invalid or expired',
+          error: 'SESSION_REVOKED'
+        });
+      }
+    } catch (sessionError) {
+      console.error('Session validation error during refresh:', sessionError);
+      return res.status(500).json({
+        success: false,
+        message: 'Session validation failed',
+        error: 'SESSION_VALIDATION_FAILED'
+      });
+    }
 
     // Generate new token
-    const token = jwt.sign(
+    const newToken = jwt.sign(
       { userId, email, role, collegeId, year },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 
+    // Extract expiration time from new JWT
+    const decoded = jwt.decode(newToken);
+    const newExpiresAt = new Date(decoded.exp * 1000);
+
+    // Update session with new token
+    try {
+      await sessionService.updateSession(oldToken, newToken, newExpiresAt);
+      console.log(`Updated session for user ${userId} with new token`);
+    } catch (sessionError) {
+      console.error('Error updating session:', sessionError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to update session',
+        error: 'SESSION_UPDATE_FAILED'
+      });
+    }
+
     res.json({
       success: true,
       message: 'Token refreshed successfully',
-      data: { token }
+      data: { token: newToken }
     });
   } catch (error) {
     console.error('Token refresh error:', error);
@@ -239,12 +312,44 @@ router.post('/refresh', authenticateToken, async (req, res) => {
   }
 });
 
-// Logout (client-side token invalidation)
-router.post('/logout', authenticateToken, (req, res) => {
-  res.json({
-    success: true,
-    message: 'Logout successful'
-  });
+// Logout (revoke session)
+router.post('/logout', authenticateToken, async (req, res) => {
+  try {
+    // Extract token from request (set by authenticateToken middleware)
+    const token = req.token;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: 'No token found in request',
+        error: 'NO_TOKEN'
+      });
+    }
+
+    // Revoke the session
+    try {
+      const revoked = await sessionService.revokeSession(token);
+      
+      if (!revoked) {
+        console.warn('Session not found or already revoked for token');
+      }
+    } catch (sessionError) {
+      console.error('Error revoking session:', sessionError);
+      // Continue with logout response even if revocation fails
+    }
+
+    res.json({
+      success: true,
+      message: 'Logout successful'
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Logout failed',
+      error: 'LOGOUT_FAILED'
+    });
+  }
 });
 
 export default router;

@@ -1,144 +1,133 @@
-import crypto from 'crypto';
-
 /**
  * Tests for Session Service
  * Feature: single-device-session-management
+ * 
+ * DEVELOPMENT MODE: Token hashing is disabled - tokens stored as plain text
  * 
  * Note: These tests focus on the hash function which doesn't require database mocking.
  * Full integration tests with database operations should be run separately with a test database.
  */
 
 describe('SessionService - Core Functionality', () => {
-  // Create a minimal sessionService-like object for testing
+  // DEVELOPMENT MODE: No hashing - return token as-is
   const hashToken = (token) => {
-    return crypto.createHash('sha256').update(token).digest('hex');
+    return token;
   };
 
   /**
    * Property 3: Token-Session Correspondence (partial)
    * Validates: Requirements 2.1, 2.2
    * 
-   * Tests that token hashing is consistent and produces valid SHA-256 hashes
+   * DEVELOPMENT MODE: Tests that tokens are stored as-is without hashing
    */
-  describe('Token Hashing - Property 3', () => {
-    it('should hash a token using SHA-256', () => {
+  describe('Token Hashing - Property 3 (Development Mode)', () => {
+    it('should return token as-is without hashing', () => {
       const token = 'test-jwt-token-12345';
-      const hash = hashToken(token);
+      const result = hashToken(token);
 
-      // SHA-256 produces 64 character hex string
-      expect(hash).toHaveLength(64);
-      expect(hash).toMatch(/^[a-f0-9]{64}$/);
+      // In development mode, token is returned unchanged
+      expect(result).toBe(token);
     });
 
-    it('should produce consistent hashes for the same token', () => {
+    it('should preserve token exactly', () => {
       const token = 'test-jwt-token-12345';
-      const hash1 = hashToken(token);
-      const hash2 = hashToken(token);
+      const result1 = hashToken(token);
+      const result2 = hashToken(token);
 
-      expect(hash1).toBe(hash2);
+      expect(result1).toBe(token);
+      expect(result2).toBe(token);
+      expect(result1).toBe(result2);
     });
 
-    it('should produce different hashes for different tokens', () => {
+    it('should preserve different tokens differently', () => {
       const token1 = 'test-jwt-token-12345';
       const token2 = 'test-jwt-token-67890';
-      const hash1 = hashToken(token1);
-      const hash2 = hashToken(token2);
+      const result1 = hashToken(token1);
+      const result2 = hashToken(token2);
 
-      expect(hash1).not.toBe(hash2);
-    });
-
-    it('should match Node.js crypto SHA-256 output', () => {
-      const token = 'test-jwt-token-12345';
-      const expectedHash = crypto.createHash('sha256').update(token).digest('hex');
-      const actualHash = hashToken(token);
-
-      expect(actualHash).toBe(expectedHash);
+      expect(result1).toBe(token1);
+      expect(result2).toBe(token2);
+      expect(result1).not.toBe(result2);
     });
   });
 
   /**
-   * Edge Cases for Token Hashing
+   * Edge Cases for Token Storage
    * Validates: Requirements 2.1, 2.2
+   * 
+   * DEVELOPMENT MODE: Tests that tokens are preserved exactly
    */
-  describe('Token Hashing - Edge Cases', () => {
+  describe('Token Storage - Edge Cases (Development Mode)', () => {
     it('should handle empty strings', () => {
       const token = '';
-      const hash = hashToken(token);
+      const result = hashToken(token);
 
-      expect(hash).toHaveLength(64);
-      expect(hash).toMatch(/^[a-f0-9]{64}$/);
+      expect(result).toBe('');
     });
 
     it('should handle very long tokens', () => {
       const token = 'a'.repeat(10000);
-      const hash = hashToken(token);
+      const result = hashToken(token);
 
-      expect(hash).toHaveLength(64);
-      expect(hash).toMatch(/^[a-f0-9]{64}$/);
+      expect(result).toBe(token);
+      expect(result).toHaveLength(10000);
     });
 
     it('should handle special characters', () => {
       const token = 'test!@#$%^&*()_+-=[]{}|;:,.<>?/~`';
-      const hash = hashToken(token);
+      const result = hashToken(token);
 
-      expect(hash).toHaveLength(64);
-      expect(hash).toMatch(/^[a-f0-9]{64}$/);
+      expect(result).toBe(token);
     });
 
     it('should handle Unicode characters', () => {
       const token = 'test-token-with-émojis-🎉🎊';
-      const hash = hashToken(token);
+      const result = hashToken(token);
 
-      expect(hash).toHaveLength(64);
-      expect(hash).toMatch(/^[a-f0-9]{64}$/);
+      expect(result).toBe(token);
     });
 
     it('should handle tokens with newlines', () => {
       const token = 'test\ntoken\nwith\nnewlines';
-      const hash = hashToken(token);
+      const result = hashToken(token);
 
-      expect(hash).toHaveLength(64);
-      expect(hash).toMatch(/^[a-f0-9]{64}$/);
+      expect(result).toBe(token);
     });
 
     it('should handle tokens with null bytes', () => {
       const token = 'test\x00token';
-      const hash = hashToken(token);
+      const result = hashToken(token);
 
-      expect(hash).toHaveLength(64);
-      expect(hash).toMatch(/^[a-f0-9]{64}$/);
+      expect(result).toBe(token);
     });
   });
 
   /**
-   * Security Properties
+   * Development Mode Properties
    * Validates: Requirements 2.2, 7.4
+   * 
+   * DEVELOPMENT MODE: Tokens are stored as plain text for easier debugging
    */
-  describe('Token Hashing - Security', () => {
-    it('should produce cryptographically different hashes for similar tokens', () => {
+  describe('Token Storage - Development Mode', () => {
+    it('should preserve tokens for similar inputs', () => {
       const token1 = 'jwt-token-user-123';
       const token2 = 'jwt-token-user-124';
-      const hash1 = hashToken(token1);
-      const hash2 = hashToken(token2);
+      const result1 = hashToken(token1);
+      const result2 = hashToken(token2);
 
-      // Even one character difference should produce completely different hash
-      expect(hash1).not.toBe(hash2);
-      
-      // Count different characters (should be many, not just a few)
-      let differentChars = 0;
-      for (let i = 0; i < 64; i++) {
-        if (hash1[i] !== hash2[i]) differentChars++;
-      }
-      expect(differentChars).toBeGreaterThan(30); // Avalanche effect
+      // Tokens are preserved exactly
+      expect(result1).toBe(token1);
+      expect(result2).toBe(token2);
+      expect(result1).not.toBe(result2);
     });
 
-    it('should not be reversible', () => {
+    it('should be readable and debuggable', () => {
       const token = 'secret-jwt-token';
-      const hash = hashToken(token);
+      const result = hashToken(token);
 
-      // Hash should not contain the original token
-      expect(hash).not.toContain(token);
-      expect(hash.toLowerCase()).not.toContain(token.toLowerCase());
+      // In development mode, token is readable
+      expect(result).toBe(token);
+      expect(result).toContain('secret');
     });
   });
 });

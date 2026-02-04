@@ -209,10 +209,10 @@ class BookController {
       // Upload new PDF to S3
       const uploadResult = await fileUploadService.uploadBookPdf(file, bookId);
 
-      // Update book record with S3 URL and mark as question paper
+      // Update book record with S3 URL in both pdf_url and question_paper columns
       await book.update({
         pdf_url: uploadResult.publicUrl,
-        question_paper: true
+        question_paper: uploadResult.publicUrl
       });
 
       return res.json({
@@ -221,9 +221,9 @@ class BookController {
         data: {
           book_id: bookId,
           pdf_url: uploadResult.publicUrl,
+          question_paper: uploadResult.publicUrl,
           signed_url: uploadResult.signedUrl,
-          original_name: uploadResult.originalName,
-          question_paper: true
+          original_name: uploadResult.originalName
         }
       });
 

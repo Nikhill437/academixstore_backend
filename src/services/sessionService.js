@@ -9,13 +9,11 @@ import { Op } from 'sequelize';
 class SessionService {
   /**
    * Hash a JWT token for secure storage using SHA-256
-   * DEVELOPMENT MODE: Returns token as-is without hashing
    * @param {string} token - JWT token
-   * @returns {string} Token (plain text in development)
+   * @returns {string} SHA-256 hash of token
    */
   hashToken(token) {
-    // DEVELOPMENT MODE: No hashing - store tokens as plain text
-    return token;
+    return crypto.createHash('sha256').update(token).digest('hex');
   }
 
   /**

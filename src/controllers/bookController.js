@@ -356,6 +356,27 @@ class BookController {
       delete bookData.pdf_url;
     }
 
+    // Generate signed URL for question paper access (valid for 1 hour)
+    if (bookData.question_paper) {
+      try {
+        const key = extractS3Key(bookData.question_paper);
+        if (key) {
+          bookData.question_paper_access_url = generateSignedUrl(key, 3600);
+          console.log(`✅ Generated signed URL for question paper, book ${bookData.id}, key: ${key}`);
+        } else {
+          console.error(`❌ Failed to extract S3 key from question paper URL: ${bookData.question_paper}`);
+          // Fallback: try to use the direct URL (will fail if not public)
+          bookData.question_paper_access_url = bookData.question_paper;
+        }
+      } catch (error) {
+        console.error('❌ Failed to generate question paper signed URL:', error.message);
+        // Fallback: try to use the direct URL (will fail if not public)
+        bookData.question_paper_access_url = bookData.question_paper;
+      }
+      // Remove direct URL for security
+      delete bookData.question_paper;
+    }
+
     // Generate signed URL for cover image access (valid for 1 hour)
     if (bookData.cover_image_url) {
       try {

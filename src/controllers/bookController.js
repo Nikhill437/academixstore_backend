@@ -197,8 +197,10 @@ class BookController {
       if (book.pdf_url) {
         try {
           // Extract key from URL
-          const oldKey = book.pdf_url.split('/').slice(-2).join('/'); // Get last two parts
-          await fileUploadService.deleteFile(oldKey);
+          const oldKey = extractS3Key(book.pdf_url);
+          if (oldKey) {
+            await fileUploadService.deleteFile(oldKey);
+          }
         } catch (deleteError) {
           console.warn('Failed to delete old PDF:', deleteError.message);
         }
@@ -283,8 +285,10 @@ class BookController {
       // Delete old cover if exists
       if (book.cover_image_url) {
         try {
-          const oldKey = book.cover_image_url.split('/').slice(-2).join('/');
-          await fileUploadService.deleteFile(oldKey);
+          const oldKey = extractS3Key(book.cover_image_url);
+          if (oldKey) {
+            await fileUploadService.deleteFile(oldKey);
+          }
         } catch (deleteError) {
           console.warn('Failed to delete old cover:', deleteError.message);
         }
@@ -323,8 +327,12 @@ class BookController {
     if (!pdfUrl) return null;
     
     try {
-      // Extract the S3 key from the URL
-      const key = pdfUrl.split('/').slice(-2).join('/');
+      // Extract the S3 key from the URL using the proper extraction function
+      const key = extractS3Key(pdfUrl);
+      if (!key) {
+        console.error('Failed to extract S3 key from PDF URL:', pdfUrl);
+        return null;
+      }
       return generateSignedUrl(key, expirySeconds);
     } catch (error) {
       console.warn('Failed to generate signed URL:', error.message);
@@ -582,11 +590,56 @@ class BookController {
     // Add purchased field to all books
     const booksWithPurchased = await this._addPurchasedField(booksWithUrls, userId, userRole);
 
+    // Add question papers to each book based on matching college, year, and semester
+    const booksWithQuestionPapers = await Promise.all(
+      booksWithPurchased.map(async (book) => {
+        try {
+          const { QuestionPaper } = await import('../models/index.js');
+          
+          // Build where clause for question papers
+          const qpWhereClause = {
+            is_active: true,
+            year: book.year,
+            semester: book.semester
+          };
+          
+          // Add college filter if book has college_id
+          if (book.college_id) {
+            qpWhereClause.college_id = book.college_id;
+          }
+          
+          // Optionally filter by subject if book has subject
+          if (book.subject) {
+            qpWhereClause.subject = book.subject;
+          }
+          
+          const questionPapers = await QuestionPaper.findAll({
+            where: qpWhereClause,
+            attributes: ['id', 'title', 'description', 'subject', 'year', 'semester', 'exam_type', 'marks', 'pdf_url'],
+            order: [['exam_type', 'ASC'], ['title', 'ASC']]
+          });
+          
+          // Add question papers to book object
+          return {
+            ...book,
+            question_papers: questionPapers.map(qp => qp.toJSON())
+          };
+        } catch (error) {
+          console.error(`Error fetching question papers for book ${book.id}:`, error);
+          // Return book without question papers on error
+          return {
+            ...book,
+            question_papers: []
+          };
+        }
+      })
+    );
+
     return res.json({
       success: true,
       data: {
-        books: booksWithPurchased,
-        count: booksWithPurchased.length
+        books: booksWithQuestionPapers,
+        count: booksWithQuestionPapers.length
       }
     });
 
@@ -650,6 +703,41 @@ class BookController {
     // Add purchased field
     const bookWithPurchased = await this._addPurchasedField(bookData, userId, userRole);
 
+    // Add question papers based on matching college, year, and semester
+    try {
+      const { QuestionPaper } = await import('../models/index.js');
+      
+      // Build where clause for question papers
+      const qpWhereClause = {
+        is_active: true,
+        year: bookWithPurchased.year,
+        semester: bookWithPurchased.semester
+      };
+      
+      // Add college filter if book has college_id
+      if (bookWithPurchased.college_id) {
+        qpWhereClause.college_id = bookWithPurchased.college_id;
+      }
+      
+      // Optionally filter by subject if book has subject
+      if (bookWithPurchased.subject) {
+        qpWhereClause.subject = bookWithPurchased.subject;
+      }
+      
+      const questionPapers = await QuestionPaper.findAll({
+        where: qpWhereClause,
+        attributes: ['id', 'title', 'description', 'subject', 'year', 'semester', 'exam_type', 'marks', 'pdf_url'],
+        order: [['exam_type', 'ASC'], ['title', 'ASC']]
+      });
+      
+      // Add question papers to book object
+      bookWithPurchased.question_papers = questionPapers.map(qp => qp.toJSON());
+    } catch (error) {
+      console.error(`Error fetching question papers for book ${bookWithPurchased.id}:`, error);
+      // Set empty array on error
+      bookWithPurchased.question_papers = [];
+    }
+
     return res.json({
       success: true,
       data: {
@@ -703,7 +791,15 @@ class BookController {
     // Generate new signed URL (valid for 1 hour)
     let pdfAccessUrl = null;
     try {
-      const key = book.pdf_url.split('/').slice(-2).join('/');
+      const key = extractS3Key(book.pdf_url);
+      if (!key) {
+        console.error('Failed to extract S3 key from PDF URL:', book.pdf_url);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to extract S3 key from PDF URL',
+          error: 'INVALID_PDF_URL'
+        });
+      }
       pdfAccessUrl = generateSignedUrl(key, 3600);
     } catch (error) {
       console.warn('Failed to generate signed URL:', error.message);
@@ -895,10 +991,12 @@ class BookController {
       // Delete files from S3
       const filesToDelete = [];
       if (book.pdf_url) {
-        filesToDelete.push(book.pdf_url.split('/').slice(-2).join('/'));
+        const pdfKey = extractS3Key(book.pdf_url);
+        if (pdfKey) filesToDelete.push(pdfKey);
       }
       if (book.cover_image_url) {
-        filesToDelete.push(book.cover_image_url.split('/').slice(-2).join('/'));
+        const coverKey = extractS3Key(book.cover_image_url);
+        if (coverKey) filesToDelete.push(coverKey);
       }
 
       // Delete files from S3 (don't fail if deletion fails)

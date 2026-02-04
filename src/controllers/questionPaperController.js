@@ -453,8 +453,10 @@ class QuestionPaperController {
       // Delete file from S3 if exists
       if (questionPaper.pdf_url) {
         try {
-          const key = questionPaper.pdf_url.split('/').slice(-2).join('/');
-          await fileUploadService.deleteFile(key);
+          const key = extractS3Key(questionPaper.pdf_url);
+          if (key) {
+            await fileUploadService.deleteFile(key);
+          }
         } catch (deleteError) {
           console.warn(`Failed to delete S3 file:`, deleteError.message);
         }
@@ -502,8 +504,12 @@ class QuestionPaperController {
     if (!pdfUrl) return null;
     
     try {
-      // Extract the S3 key from the URL
-      const key = pdfUrl.split('/').slice(-2).join('/');
+      // Extract the S3 key from the URL using the proper extraction function
+      const key = extractS3Key(pdfUrl);
+      if (!key) {
+        console.error('Failed to extract S3 key from PDF URL:', pdfUrl);
+        return null;
+      }
       return generateSignedUrl(key, expirySeconds);
     } catch (error) {
       console.warn('Failed to generate signed URL:', error.message);
@@ -561,8 +567,10 @@ class QuestionPaperController {
       if (questionPaper.pdf_url) {
         try {
           // Extract key from URL
-          const oldKey = questionPaper.pdf_url.split('/').slice(-2).join('/');
-          await fileUploadService.deleteFile(oldKey);
+          const oldKey = extractS3Key(questionPaper.pdf_url);
+          if (oldKey) {
+            await fileUploadService.deleteFile(oldKey);
+          }
         } catch (deleteError) {
           console.warn('Failed to delete old PDF:', deleteError.message);
         }
@@ -634,7 +642,15 @@ class QuestionPaperController {
       // Generate new signed URL (valid for 1 hour)
       let pdfAccessUrl = null;
       try {
-        const key = questionPaper.pdf_url.split('/').slice(-2).join('/');
+        const key = extractS3Key(questionPaper.pdf_url);
+        if (!key) {
+          console.error('Failed to extract S3 key from PDF URL:', questionPaper.pdf_url);
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to extract S3 key from PDF URL',
+            error: 'INVALID_PDF_URL'
+          });
+        }
         pdfAccessUrl = generateSignedUrl(key, 3600);
       } catch (error) {
         console.warn('Failed to generate signed URL:', error.message);

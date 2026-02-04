@@ -98,6 +98,11 @@ const Book = sequelize.define('Book', {
     allowNull: true,
     field: 'cover_image_url'
   },
+  question_paper: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    field: 'question_paper'
+  },
   // Access control
   college_id: {
     type: DataTypes.UUID,

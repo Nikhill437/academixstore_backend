@@ -97,7 +97,7 @@ class BookController {
         category,
         subject,
         language,
-        year: parseInt(year),
+        year: year, // Keep as string to support values like "F.Y.BSc"
         semester: parseInt(semester),
         pages: pages ? parseInt(pages) : null,
         college_id: bookCollegeId,
@@ -598,7 +598,7 @@ class BookController {
 
     // Add filters
     if (category) whereClause.category = category;
-    if (year) whereClause.year = parseInt(year);
+    if (year) whereClause.year = year; // Keep as string to support values like "F.Y.BSc"
     if (semester) whereClause.semester = parseInt(semester);
 
     const books = await Book.findAll({

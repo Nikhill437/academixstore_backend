@@ -71,8 +71,7 @@ const Book = sequelize.define('Book', {
     type: DataTypes.STRING,
     allowNull: false,
     validate: {
-      min: 2020,
-      max: 2030
+      notEmpty: true
     }
   },
   semester: {

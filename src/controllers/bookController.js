@@ -209,10 +209,16 @@ class BookController {
       // Upload new PDF to S3
       const uploadResult = await fileUploadService.uploadBookPdf(file, bookId);
 
-      // Update book record with S3 URL in both pdf_url and question_paper columns
+      // Verify the upload was successful
+      if (!uploadResult || !uploadResult.publicUrl) {
+        throw new Error('File upload failed - no URL returned');
+      }
+
+      console.log(`✅ Book PDF uploaded successfully to S3: ${uploadResult.publicUrl}`);
+
+      // Update book record with S3 URL (only pdf_url, not question_paper)
       await book.update({
-        pdf_url: uploadResult.publicUrl,
-        question_paper: uploadResult.publicUrl
+        pdf_url: uploadResult.publicUrl
       });
 
       return res.json({
@@ -221,7 +227,6 @@ class BookController {
         data: {
           book_id: bookId,
           pdf_url: uploadResult.publicUrl,
-          question_paper: uploadResult.publicUrl,
           signed_url: uploadResult.signedUrl,
           original_name: uploadResult.originalName
         }
@@ -298,6 +303,13 @@ class BookController {
 
       // Upload new PDF to S3
       const uploadResult = await fileUploadService.uploadBookPdf(file, bookId);
+
+      // Verify the upload was successful
+      if (!uploadResult || !uploadResult.publicUrl) {
+        throw new Error('File upload failed - no URL returned');
+      }
+
+      console.log(`✅ Question paper PDF uploaded successfully to S3: ${uploadResult.publicUrl}`);
 
       // Update book record with question paper URL only
       await book.update({
@@ -387,6 +399,13 @@ class BookController {
       // Upload new cover to S3
       const uploadResult = await fileUploadService.uploadBookCover(file, bookId);
 
+      // Verify the upload was successful
+      if (!uploadResult || !uploadResult.publicUrl) {
+        throw new Error('File upload failed - no URL returned');
+      }
+
+      console.log(`✅ Book cover uploaded successfully to S3: ${uploadResult.publicUrl}`);
+
       // Update book record
       await book.update({
         cover_image_url: uploadResult.publicUrl
@@ -437,19 +456,19 @@ class BookController {
   _addFileUrlsToBook(book) {
     const bookData = book.toSafeJSON ? book.toSafeJSON() : book.get();
     
-    // Generate signed URL for PDF access (valid for 1 hour)
+    // Generate signed URL for PDF access (valid for 7 days)
     if (bookData.pdf_url) {
-      bookData.pdf_access_url = this._generatePdfAccessUrl(bookData.pdf_url, 3600);
+      bookData.pdf_access_url = this._generatePdfAccessUrl(bookData.pdf_url, 604800); // 7 days in seconds
       // Remove direct URL for security
       delete bookData.pdf_url;
     }
 
-    // Generate signed URL for question paper access (valid for 1 hour)
+    // Generate signed URL for question paper access (valid for 7 days)
     if (bookData.question_paper) {
       try {
         const key = extractS3Key(bookData.question_paper);
         if (key) {
-          bookData.question_paper_access_url = generateSignedUrl(key, 3600);
+          bookData.question_paper_access_url = generateSignedUrl(key, 604800); // 7 days in seconds
           console.log(`✅ Generated signed URL for question paper, book ${bookData.id}, key: ${key}`);
         } else {
           console.error(`❌ Failed to extract S3 key from question paper URL: ${bookData.question_paper}`);
@@ -465,12 +484,12 @@ class BookController {
       delete bookData.question_paper;
     }
 
-    // Generate signed URL for cover image access (valid for 1 hour)
+    // Generate signed URL for cover image access (valid for 7 days)
     if (bookData.cover_image_url) {
       try {
         const key = extractS3Key(bookData.cover_image_url);
         if (key) {
-          bookData.cover_image_access_url = generateSignedUrl(key, 3600);
+          bookData.cover_image_access_url = generateSignedUrl(key, 604800); // 7 days in seconds
           console.log(`✅ Generated signed URL for cover image, book ${bookData.id}, key: ${key}`);
         } else {
           console.error(`❌ Failed to extract S3 key from cover URL: ${bookData.cover_image_url}`);

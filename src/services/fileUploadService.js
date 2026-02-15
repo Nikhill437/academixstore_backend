@@ -141,6 +141,13 @@ class FileUploadService {
       // Upload to S3
       const result = await s3.upload(uploadParams).promise();
 
+      // Verify the upload result
+      if (!result || !result.Key || !result.Location) {
+        throw new Error('S3 upload completed but returned invalid result');
+      }
+
+      console.log(`✅ File uploaded to S3 successfully: ${result.Key}`);
+
       return {
         key: result.Key,
         location: result.Location,

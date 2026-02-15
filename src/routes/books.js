@@ -9,6 +9,7 @@ import {
   uploadBookFile, 
   uploadCoverImage, 
   uploadBookWithCover,
+  uploadQuestionPaperFile,
   handleFileUploadErrors 
 } from '../middleware/fileUpload.js';
 import bookController from '../controllers/bookController.js';
@@ -175,6 +176,15 @@ router.post('/:bookId/upload-pdf',
   uploadBookFile, // Multer middleware for 'book' field
   handleFileUploadErrors,
   (req, res) => bookController.uploadBookPdf(req, res)
+);
+
+// Upload question paper PDF file (stores in question_paper column only)
+router.post('/:bookId/upload-question-paper', 
+  authenticateToken, 
+  requireAdmin,
+  uploadQuestionPaperFile, // Multer middleware for 'question_paper' field
+  handleFileUploadErrors,
+  (req, res) => bookController.uploadQuestionPaperPdf(req, res)
 );
 
 // Upload book cover image

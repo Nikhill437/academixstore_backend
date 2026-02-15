@@ -239,6 +239,94 @@ class BookController {
   }
 
   /**
+   * Upload question paper PDF file (stores only in question_paper column)
+   */
+  async uploadQuestionPaperPdf(req, res) {
+    try {
+      const { bookId } = req.params;
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({
+          success: false,
+          message: 'No PDF file provided',
+          error: 'NO_FILE'
+        });
+      }
+
+      // Find the book
+      const book = await Book.findByPk(bookId);
+      if (!book) {
+        return res.status(404).json({
+          success: false,
+          message: 'Book not found',
+          error: 'BOOK_NOT_FOUND'
+        });
+      }
+
+      // Check permissions
+      const userRole = req.user.role;
+      const userCollegeId = req.user.collegeId;
+
+      if (userRole === 'college_admin' && book.college_id !== userCollegeId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied to this book',
+          error: 'ACCESS_DENIED'
+        });
+      }
+
+      if (!['super_admin', 'college_admin'].includes(userRole)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Insufficient permissions to upload question papers',
+          error: 'INSUFFICIENT_PERMISSIONS'
+        });
+      }
+
+      // Delete old question paper PDF if exists
+      if (book.question_paper) {
+        try {
+          const oldKey = extractS3Key(book.question_paper);
+          if (oldKey) {
+            await fileUploadService.deleteFile(oldKey);
+          }
+        } catch (deleteError) {
+          console.warn('Failed to delete old question paper PDF:', deleteError.message);
+        }
+      }
+
+      // Upload new PDF to S3
+      const uploadResult = await fileUploadService.uploadBookPdf(file, bookId);
+
+      // Update book record with question paper URL only
+      await book.update({
+        question_paper: uploadResult.publicUrl
+      });
+
+      return res.json({
+        success: true,
+        message: 'Question paper PDF uploaded successfully',
+        data: {
+          book_id: bookId,
+          question_paper: uploadResult.publicUrl,
+          signed_url: uploadResult.signedUrl,
+          original_name: uploadResult.originalName
+        }
+      });
+
+    } catch (error) {
+      console.error('Upload question paper PDF error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to upload question paper PDF',
+        error: 'UPLOAD_ERROR',
+        details: error.message
+      });
+    }
+  }
+
+  /**
    * Upload book cover image
    */
   async uploadBookCover(req, res) {

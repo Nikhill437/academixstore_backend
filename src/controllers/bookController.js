@@ -515,34 +515,43 @@ class BookController {
    * @returns {Promise<Set<string>>} Set of purchased book IDs
    */
   async _checkPurchaseStatus(userId, bookIds) {
-    try {
-      // If no book IDs provided, return empty set
-      if (!bookIds || bookIds.length === 0) {
+      try {
+        // If no book IDs provided, return empty set
+        if (!bookIds || bookIds.length === 0) {
+          return new Set();
+        }
+
+        // Query orders table for paid orders, joining with books to check is_active status
+        const purchasedOrders = await Order.findAll({
+          where: {
+            user_id: userId,
+            book_id: { [Op.in]: bookIds },
+            status: 'paid'
+          },
+          include: [{
+            model: Book,
+            as: 'book',
+            attributes: ['id', 'is_active'],
+            where: {
+              is_active: true
+            },
+            required: true
+          }],
+          attributes: ['book_id'],
+          raw: true
+        });
+
+        // Return Set of purchased book IDs for O(1) lookup
+        return new Set(purchasedOrders.map(order => order.book_id));
+      } catch (error) {
+        // Log error but don't fail the request
+        console.error('Error checking purchase status:', error);
+        console.error('User ID:', userId, 'Book IDs:', bookIds);
+
+        // Return empty Set on error (default to not purchased)
         return new Set();
       }
-
-      // Query orders table for paid orders in a single query
-      const purchasedOrders = await Order.findAll({
-        where: {
-          user_id: userId,
-          book_id: { [Op.in]: bookIds },
-          status: 'paid'
-        },
-        attributes: ['book_id'],
-        raw: true
-      });
-
-      // Return Set of purchased book IDs for O(1) lookup
-      return new Set(purchasedOrders.map(order => order.book_id));
-    } catch (error) {
-      // Log error but don't fail the request
-      console.error('Error checking purchase status:', error);
-      console.error('User ID:', userId, 'Book IDs:', bookIds);
-      
-      // Return empty Set on error (default to not purchased)
-      return new Set();
     }
-  }
 
   /**
    * Helper method to add purchased field to book objects

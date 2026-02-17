@@ -216,7 +216,7 @@ router.get('/my-purchases',
         whereClause.status = status;
       }
 
-      // Fetch orders with book details
+      // Fetch orders with book details (only active books)
       const orders = await Order.findAndCountAll({
         where: whereClause,
         include: [
@@ -237,7 +237,11 @@ router.get('/my-purchases',
               'rating',
               'pdf_url',
               'cover_image_url'
-            ]
+            ],
+            where: {
+              is_active: true
+            },
+            required: true
           }
         ],
         limit: parseInt(limit),

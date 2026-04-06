@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: educational-book-subscription
+    name: academixstore-backend
     env: node
     plan: free
     buildCommand: npm install
@@ -9,10 +9,26 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        value: your_neon_database_url_here
+        fromDatabase:
+          name: academixstore
+          property: connectionString
       - key: JWT_SECRET
-        value: your-super-secret-jwt-key-change-in-production-min-32-chars
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
       - key: AWS_REGION
         value: ap-south-1
       - key: AWS_S3_BUCKET
-        value: academixstore
+        value: acadmixstore-educational-books-add
+      - key: PORT
+        value: 3000
+
+databases:
+  - name: academixstore
+    databaseName: academixstore
+    user: academixstore_user
+    plan: free

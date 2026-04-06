@@ -1,8 +1,28 @@
 import express from 'express';
 import { Advertisement, User, College } from '../models/index.js';
-import { requireRoles } from '../middleware/rbac.js';
+import { authenticateToken } from '../middleware/auth.js';
+import { requireRoles, requireAdmin } from '../middleware/rbac.js';
+import { uploadAdvertisementImage, handleFileUploadErrors } from '../middleware/fileUpload.js';
+import advertisementController from '../controllers/advertisementController.js';
 
 const router = express.Router();
+
+/**
+ * File upload routes
+ */
+
+// Upload advertisement image
+router.post('/:adId/upload-image',
+  authenticateToken,
+  requireAdmin,
+  uploadAdvertisementImage, // Multer middleware for 'image' field
+  handleFileUploadErrors,
+  (req, res) => advertisementController.uploadAdvertisementImage(req, res)
+);
+
+/**
+ * CRUD routes
+ */
 
 // Get all advertisements (public)
 router.get('/', async (req, res) => {
